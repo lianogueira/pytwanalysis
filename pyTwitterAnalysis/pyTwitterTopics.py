@@ -25,7 +25,6 @@ from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 
 
 
-
 #dictionary_words = dict.fromkeys(words.words(), None)
    
 #stopWords = set(stopwords.words('english'))
@@ -44,7 +43,7 @@ lemma = WordNetLemmatizer()
 #lda_model = ""
 
 
-class pyTwitterTopics:   
+class tw_topics:   
 
     def __init__(self, folder_path, mongoDB_database=None):
                     

@@ -24,7 +24,8 @@ import scipy.sparse.linalg as SLA
 import pandas as pd
 import seaborn as sns
     
-class pyTwitterGraphAnalysis:   
+    
+class tw_graph:   
 
     def __init__(self, folder_path):
         

@@ -1,6 +1,12 @@
-from pyTwitterGraphAnalysis import pyTwitterGraphAnalysis
-from pyTwitterDB import pyTwitterDB_class
-from pyTwitterTopics import pyTwitterTopics
+
+#import pyTwitterAnalysis.tw_graph
+#import pyTwitterAnalysis.tw_database
+#import pyTwitterAnalysis.tw_topics
+
+from pyTwitterAnalysis.pyTwitterGraphAnalysis import tw_graph
+from pyTwitterAnalysis.pyTwitterDB import tw_database
+from pyTwitterAnalysis.pyTwitterTopics import tw_topics
+
 
 from pymongo import MongoClient
 import networkx as nx
@@ -13,12 +19,14 @@ import matplotlib.pyplot as plt
 
 
 
-class pyTwitterAnalysis(pyTwitterGraphAnalysis, pyTwitterDB_class, pyTwitterTopics):
+class tw_analysis(tw_graph, tw_database, tw_topics):
 
-    def __init__(self, base_folder_path, mongoDB_database, strFocusedTweetFields, strFocusedTweetUserFields):        
-        pyTwitterGraphAnalysis.__init__(self,base_folder_path)
-        pyTwitterDB_class.__init__(self, mongoDB_database, strFocusedTweetFields, strFocusedTweetUserFields)
-        pyTwitterTopics.__init__(self, base_folder_path, mongoDB_database)
+    def __init__(self, base_folder_path, mongoDB_database,  
+                 strFocusedTweetFields="id_str;created_at;lang;retweet_count;in_reply_to_status_id_str;in_reply_to_screen_name", 
+                 strFocusedTweetUserFields="name;screen_name;description;location;followers_count;friends_count;statuses_count;lang;verified"):        
+        tw_graph.__init__(self,base_folder_path)
+        tw_database.__init__(self, mongoDB_database, strFocusedTweetFields, strFocusedTweetUserFields)
+        tw_topics.__init__(self, base_folder_path, mongoDB_database)
         
         
     #creates a path to add the files for this node    

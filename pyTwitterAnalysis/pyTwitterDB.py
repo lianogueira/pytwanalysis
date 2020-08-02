@@ -37,9 +37,11 @@ topic_doc_complete = []
 
 
 
-class pyTwitterDB_class:   
+class tw_database:
 
-    def __init__(self, mongoDB_database, strFocusedTweetFields, strFocusedTweetUserFields):
+    def __init__(self, mongoDB_database, 
+                 strFocusedTweetFields="id_str;created_at;lang;retweet_count;in_reply_to_status_id_str;in_reply_to_screen_name", 
+                 strFocusedTweetUserFields="name;screen_name;description;location;followers_count;friends_count;statuses_count;lang;verified"):
         #Inititalizing MongoDB collections        
         self.db = mongoDB_database                
         self.db.dc_bSettings = self.db.adm_dbSettings
