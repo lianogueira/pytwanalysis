@@ -1,12 +1,10 @@
 # pyTwitterAnalysis
 A tool to gather, discover, and analyze Twitter data using a combinations of graph-clustering and topic modeling techniques with the goal of semantically grouping tweet messages together. 
 
-
 #### **Installation**
 
 ```
 pip install pyTwitterAnalysis
-
 ```
 
 #### **Initializing an object**
@@ -15,8 +13,7 @@ import pyTwitterAnalysis as ta
 ```
 
 ```
-#set up you mongoDB connection here
-from pymongo import MongoClient
+#set up your mongoDB connection here
 mongoDBConnectionSTR = "mongodb://localhost:27017"
 client = MongoClient(mongoDBConnectionSTR)
 db = client.yourDB #chose your DB name here
@@ -24,11 +21,11 @@ db = client.yourDB #chose your DB name here
 
 ```
 BASE_PATH = '[youFolderPath]' #path where you want to save your files
-
-x = ta.tw_analysis(BASE_PATH, db)
-
 ```
 
+```
+x = ta.tw_analysis(BASE_PATH, db)
+```
 
 
 #### **Requirements:**
