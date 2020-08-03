@@ -674,10 +674,10 @@ class tw_database:
         try:
             self.c_users.insert_many(file_data, ordered=False)
         except Exception as e:
-            if str(e) == "batch op errors occurred":  #igones if just failed when trying to insert duplicate users
+            if str(type(e).__name__) == "BulkWriteError":  #igones if just failed when trying to insert duplicate users
                 pass
             else:
-                print('Error in insert many user - ' + str(e))        
+                print('Error in insert many user - ' + str(type(e).__name__))        
         
         
         
@@ -1636,12 +1636,8 @@ class tw_database:
 
             #get data from database, loop through records and insert into array
             for x in select_ids:
-                arr.append([x['tweet_created_at'], x['id_str']])                
+                arr.append([x['tweet_created_at'], x['id_str']]) 
                 
-            if ht_to_filter is not None:
-                print('tweetIdswithDates ' + ht_to_filter.lower() + ' ' + str(len(arr)))
-            else:
-                print('tweetIdswithDates ' + str(len(arr)))
             
             #set file path
             file = filepath + 'T_tweetIdswithDates.txt'

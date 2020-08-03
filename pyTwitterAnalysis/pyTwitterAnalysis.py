@@ -89,6 +89,8 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
         #another level of contraction
         if remove_edges == 'Y':
         
+            contraction_name = ""
+        
             if len(G2.edges()) > 100000:       
                 cutoff_no = 3
                 G2 = self.remove_edges_eithernode(G2, cutoff_no)
@@ -313,7 +315,7 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
             
         self.create_path(output_path)
             
-        G = self.loadGraphFromFile(edge_file_path)        
+        G = self.loadGraphFromFile(edge_file_path)                
         self.all_analysis_file(G, parent_path, 
                                num_of_topics=num_of_topics,
                                is_bot_Filter=is_bot_Filter,
@@ -331,6 +333,7 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                                top_degree_start=top_degree_start, 
                                top_degree_end=top_degree_end
                                )
+        
                                         
         #run analysis by period using the dates set on array period_arr
         if period_arr is not None:                                    
@@ -450,33 +453,35 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
         self.print_Measures(G, fileName_to_print = output_path + "\\G_Measures-(All).txt")
         print("\n")
 
-        #get largest connected component and export file with measures
-        G = self.largest_component_no_self_loops(G)
-        self.print_Measures(G, fileName_to_print = output_path + "\\G_Measures-(LargestCC).txt")
-        print("\n")
 
-        #export files with edges and degrees
-        if create_nodes_edges_files_flag == 'Y':
-            self.nodes_edges_analysis_files(G, output_path)
-        
-        #LDA Model
-        if create_topic_model_files_flag == 'Y':
-            self.lda_analysis_files(output_path, num_of_topics, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
+        if len(G.edges) != 0:       
+            #get largest connected component and export file with measures
+            G = self.largest_component_no_self_loops(G)
+            self.print_Measures(G, fileName_to_print = output_path + "\\G_Measures-(LargestCC).txt")
+            print("\n")
 
-        #export ht frequency list 
-        if create_ht_frequency_files_flag == 'Y':           
-            self.ht_analysis_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
+            #export files with edges and degrees
+            if create_nodes_edges_files_flag == 'Y':
+                self.nodes_edges_analysis_files(G, output_path)
             
-        #export words frequency list 
-        if create_words_frequency_files_flag == 'Y':
-            self.words_analysis_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges, top_no_word_filter=top_no_word_filter)
-                             
-        #plot graph
-        if create_graphs_files_flag == 'Y':
-            self.graph_analysis_files(G, output_path, graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, comty_contract_per=comty_contract_per)
-            
-        if create_timeseries_files_flag == 'Y':
-            self.time_series_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges) 
+            #LDA Model
+            if create_topic_model_files_flag == 'Y':
+                self.lda_analysis_files(output_path, num_of_topics, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
+
+            #export ht frequency list 
+            if create_ht_frequency_files_flag == 'Y':           
+                self.ht_analysis_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
+                
+            #export words frequency list 
+            if create_words_frequency_files_flag == 'Y':
+                self.words_analysis_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges, top_no_word_filter=top_no_word_filter)
+                                 
+            #plot graph
+            if create_graphs_files_flag == 'Y':
+                self.graph_analysis_files(G, output_path, graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, comty_contract_per=comty_contract_per)
+                
+            if create_timeseries_files_flag == 'Y':
+                self.time_series_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges) 
         
         
     

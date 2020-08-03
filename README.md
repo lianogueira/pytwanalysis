@@ -37,18 +37,34 @@ x = ta.tw_analysis(BASE_PATH, db)
  + pymongo 
  + NLTK  
  + numpy  
+ + networkx 2.3 
+ + matplotlib 3.2.1 
  + gensim
- + sklearn
- + matplotlib   
- + string 
- + networkx  
+ + sklearn    
+ + python-louvain
  + scipy  
  + seaborn
  + pandas
  + wordcloud
- + json 
- + csv
+ + Pyphen
+
  
+##### **Pre-requisites installation** 
+```
+ pip install pymongo
+ pip install nltk
+ pip install numpy
+ pip install networkx==2.3
+ pip install matplotlib==3.2.1
+ pip install gensim
+ pip install -U scikit-learn 
+ pip install python-louvain 
+ pip install scipy 
+ pip install seaborn 
+ pip install pandas 
+ pip install wordcloud
+ pip install Pyphen
+```
  
  #### **Things you can do with this library:**
  + Use mongoDB to store and process your Twitter data
