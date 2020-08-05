@@ -148,7 +148,7 @@ class tw_graph:
         
         
     #Plot distribution of nodes based on graph attribute (e.g. communitiy)
-    def plot_graph_att_distr(self, G, att, title='Community Counts', xlabel='Community ID', ylabel='Count', file_name=None ):
+    def plot_graph_att_distr(self, G, att, title='Community Counts', xlabel='Community ID', ylabel='Count', file_name=None, replace_existing_file=True):
         #create dataframe based on the given attribute
         df = pd.DataFrame.from_dict(nx.get_node_attributes(G, att),  orient='index')
         df.columns = [att] 
@@ -160,7 +160,8 @@ class tw_graph:
 
         #if file name was give, save file in default folder
         if file_name != None:
-            plt.savefig(file_name)
+            if replace_existing_file==True or not os.path.exists(file_name):
+                plt.savefig(file_name)
             
         plt.show()
         plt.cla()   # Clear axis
@@ -170,7 +171,7 @@ class tw_graph:
 
         
 
-    def plot_disconnected_graph_distr(self, G, file=None):
+    def plot_disconnected_graph_distr(self, G, file=None, replace_existing_file=True):
     
         sub_conn_graphs = sorted(list(nx.connected_component_subgraphs(G)), key = len, reverse=True)
     
@@ -193,7 +194,8 @@ class tw_graph:
             
         #if file name was give, save file in default folder
         if file != None:
-            plt.savefig(file)
+            if replace_existing_file==True or not os.path.exists(file):
+                plt.savefig(file)
             
         plt.show()
         plt.cla()   # Clear axis
@@ -284,59 +286,59 @@ class tw_graph:
     def plotSpringLayoutGraph(self, G, v_graph_name, v_scale, v_k, v_iterations, 
                               cluster_fl='N', v_labels=None, kmeans_k='', v_node_color='#A0CBE2', v_edge_color='#A79894', 
                               v_width=0.05, v_node_size=0.6, v_font_size=0.4, v_dpi=900, v_alpha=0.6, v_linewidths=0.6,
-                              scale_node_size_fl='Y', draw_in_mult_steps_fl='N',node_size_multiplier=6, font_size_multiplier=7):
+                              scale_node_size_fl='Y', draw_in_mult_steps_fl='N',node_size_multiplier=6, font_size_multiplier=7, 
+                              replace_existing_file=True):
 
 
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing plotSpringLayoutGraph... Started at: " + starttime)
+        if replace_existing_file==True or not os.path.exists(v_graph_name):
+            
+            v_with_labels = True
+            if scale_node_size_fl == 'Y':
+                d = dict(G.degree)
+                v_node_size = [(v * node_size_multiplier)/10 for v in d.values()]
+                v_with_labels = False
 
-        v_with_labels = True
-        if scale_node_size_fl == 'Y':
-            d = dict(G.degree)
-            v_node_size = [(v * node_size_multiplier)/10 for v in d.values()]
-            v_with_labels = False
-
-        #node_color=v_labels,
-        #node_color=v_node_color,
-        #draw graph
-        pos=nx.spring_layout(G, scale=v_scale, k=v_k, iterations=v_iterations)   #G is my graph
-        if cluster_fl == 'N':                    
-            nx.draw(G, pos,                 
-                    width=v_width,                          
-                    edge_color=v_edge_color,
-                    node_color=v_node_color,
-                    edge_cmap=plt.cm.Blues, 
-                    with_labels=v_with_labels, 
-                    node_size=v_node_size, 
-                    font_size=v_font_size,                  
-                    linewidths=v_linewidths,
-                    alpha=v_alpha)
-        else:         
-            nx.draw(G, pos,
-                    node_color=v_labels,
-                    edge_color=v_edge_color,
-                    width=v_width,
-                    cmap=plt.cm.viridis,
-                    edge_cmap=plt.cm.Purples,
-                    with_labels=v_with_labels,
-                    node_size=v_node_size,
-                    font_size=v_font_size,
-                    linewidths=v_linewidths,
-                    alpha=v_alpha)
+            #node_color=v_labels,
+            #node_color=v_node_color,
+            #draw graph
+            pos=nx.spring_layout(G, scale=v_scale, k=v_k, iterations=v_iterations)   #G is my graph
+            if cluster_fl == 'N':                    
+                nx.draw(G, pos,                 
+                        width=v_width,                          
+                        edge_color=v_edge_color,
+                        node_color=v_node_color,
+                        edge_cmap=plt.cm.Blues, 
+                        with_labels=v_with_labels, 
+                        node_size=v_node_size, 
+                        font_size=v_font_size,                  
+                        linewidths=v_linewidths,
+                        alpha=v_alpha)
+            else:         
+                nx.draw(G, pos,
+                        node_color=v_labels,
+                        edge_color=v_edge_color,
+                        width=v_width,
+                        cmap=plt.cm.viridis,
+                        edge_cmap=plt.cm.Purples,
+                        with_labels=v_with_labels,
+                        node_size=v_node_size,
+                        font_size=v_font_size,
+                        linewidths=v_linewidths,
+                        alpha=v_alpha)
 
 
-        #draw labels - logic to print labels in nodes in case we want to change the font size to match the scale of the node size
-        if scale_node_size_fl == 'Y':
-            self.draw_scaled_labels(G, pos, v_font_size, font_size_multiplier)           
+            #draw labels - logic to print labels in nodes in case we want to change the font size to match the scale of the node size
+            if scale_node_size_fl == 'Y':
+                self.draw_scaled_labels(G, pos, v_font_size, font_size_multiplier)           
 
-        plt.savefig(v_graph_name, dpi=v_dpi, facecolor='w', edgecolor='w')
-        plt.show()
-        plt.cla()   # Clear axis
-        plt.clf()   # Clear figure
-        plt.close() # Close a figure window
 
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing plotSpringLayoutGraph. Ended at: " + endtime)    
+            plt.savefig(v_graph_name, dpi=v_dpi, facecolor='w', edgecolor='w')
+
+            plt.show()
+            plt.cla()   # Clear axis
+            plt.clf()   # Clear figure
+            plt.close() # Close a figure window
+   
 
 
         
@@ -519,8 +521,8 @@ class tw_graph:
         G2 = G.copy()    
         degree_to_contract = 1
                  
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing contract_nodes_degree1... Started at: " + starttime )
+        #starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #print("Executing contract_nodes_degree1... Started at: " + starttime )
 
         
         for node_degree in list(sorted(G2.degree, key=lambda x: x[1], reverse=True)):    
@@ -549,8 +551,8 @@ class tw_graph:
             except Exception as e:        
                 continue
 
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing contract_nodes_degree1. Ended at: " + endtime)             
+        #endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #print("Finished executing contract_nodes_degree1. Ended at: " + endtime)             
 
         return G2    
     
@@ -561,8 +563,8 @@ class tw_graph:
 
            
             
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing print_Measures... Started at: " + starttime )
+        #starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #print("Executing print_Measures... Started at: " + starttime )
         
         
         #verify if graph is connected or not
@@ -643,5 +645,5 @@ class tw_graph:
             f.close()
 
 
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing print_Measures. Ended at: " + endtime)                
+        #endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #print("Finished executing print_Measures. Ended at: " + endtime)                

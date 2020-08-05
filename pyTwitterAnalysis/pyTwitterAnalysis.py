@@ -1,12 +1,11 @@
 
-#import pyTwitterAnalysis.tw_graph
-#import pyTwitterAnalysis.tw_database
-#import pyTwitterAnalysis.tw_topics
-
 from pyTwitterAnalysis.pyTwitterGraphAnalysis import tw_graph
 from pyTwitterAnalysis.pyTwitterDB import tw_database
 from pyTwitterAnalysis.pyTwitterTopics import tw_topics
 
+#from pyTwitterGraphAnalysis import tw_graph
+#from pyTwitterDB import tw_database
+#from pyTwitterTopics import tw_topics
 
 from pymongo import MongoClient
 import networkx as nx
@@ -17,6 +16,9 @@ import csv
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+import warnings
+warnings.filterwarnings("ignore")
 
 
 class tw_analysis(tw_graph, tw_database, tw_topics):
@@ -45,7 +47,7 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
         return arr_edges
 
     
-    def build_db_collections(self, inc=100000):
+    def build_db_collections(self, inc=100000, bots_ids_list_file=None):
         
         
         ### Loading Focused Data into MongoDB
@@ -70,6 +72,28 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
         #####    
         ### Loading tweet connections - These are the edges formed between users by replies, retweets, quotes and mentions
         self.loadTweetConnections(inc) # You can set the number of tweets to analyze at a time. (Large number may cause out of memory errors, low number may take a long time to run)
+        
+        
+        #####
+        ### loading aggregate collections
+        self.loadAggregations('tweetCountByFile')
+        self.loadAggregations('tweetCountByLanguageAgg')
+        self.loadAggregations('tweetCountByMonthAgg')
+
+        
+        # Loading bots list from file - (List of user ids that are bots)
+        # SKIP this step if you don't have a bots list        
+        if bots_ids_list_file is not None:
+            bots_list_id_str = []
+            with open(bots_ids_list_file,'r') as f:
+                for line in f:
+                    line = line.rstrip("\n")
+                    bots_list_id_str.append(line)
+
+            self.set_bot_flag_based_on_arr(bots_list_id_str, 10000) 
+
+        
+
 
         
                 
@@ -85,13 +109,13 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
         att = 'community_louvain'
         G2 = self.contract_nodes_commty_per(graph_to_plot, comty_contract_per, att)
         G2 = self.largest_component_no_self_loops(G2)        
+                
+        contraction_name = "[PercComtyRm=" + str(comty_contract_per) + "]"
 
         #another level of contraction
         if remove_edges == 'Y':
-        
-            contraction_name = ""
-        
-            if len(G2.edges()) > 100000:       
+                            
+            if len(G2.edges()) > 100000:
                 cutoff_no = 3
                 G2 = self.remove_edges_eithernode(G2, cutoff_no)
                 contraction_name = contraction_name + '[RmEitherNodeCutoff=' + str(cutoff_no) +  ']'
@@ -112,7 +136,7 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                     else:
                         cutoff_no += 1000                    
                         
-                contraction_name = contraction_name + '[RmEdgeCutOff=' + str(cutoff_no) +  ']'
+                contraction_name = contraction_name + '[RmEdgeDegreeCutOff=' + str(cutoff_no) +  ']'
                         
             file = file.replace('.', contraction_name + '.') 
             
@@ -137,7 +161,7 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
             if not os.path.exists(file):
                 G_to_plot, labels2, k = self.calculate_louvain_clustering(G2)
                 #labels = nx.get_node_attributes(G2, 'community_louvain').values()
-                self.plotSpringLayoutGraph(G_to_plot, file, v_scale, v_k, v_iterations, cluster_fl='Y', v_labels=list(list(labels2)))                
+                self.plotSpringLayoutGraph(G_to_plot, file, v_scale, v_k, v_iterations, cluster_fl='Y', v_labels=list(list(labels2)), replace_existing_file=False)                
 
 
         
@@ -149,16 +173,16 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
 
         #export ALL edges for ALL periods
         print("** exporting edges for AllPeriods - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        self.exportData('edges', input_files_path + '\\AllPeriods_', 0)
+        self.exportData('edges', input_files_path + '\\AllPeriods_', 0, replace_existing_file=False)
 
         if bot_filter_fl == 'Y':
             #export edges for ALL periods, excluding edges associated with bots
             print("** exporting edges for AllPeriods_ExcludingBots - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            self.exportData('edges', input_files_path + '\\AllPeriods_ExcludingBots_', 0, is_bot_Filter = '0')
+            self.exportData('edges', input_files_path + '\\AllPeriods_ExcludingBots_', 0, is_bot_Filter = '0', replace_existing_file=False)
 
             #export edges for ALL periods, only edges associated with bots
             print("** exporting edges for AllPeriods_BotsOnly - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            self.exportData('edges', input_files_path + '\\AllPeriods_BotsOnly_', 0, is_bot_Filter = '1')
+            self.exportData('edges', input_files_path + '\\AllPeriods_BotsOnly_', 0, is_bot_Filter = '1', replace_existing_file=False)
 
 
         #export edges by period using the dates set on array period_arr
@@ -168,26 +192,34 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
 
                 #export ALL edges for this period    
                 print("** exporting edges for " + period[0] + " - "  + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                edges = self.exportData('edges', input_files_path + '\\' + period[0] + '_', 0, startDate_filter=period[1], endDate_filter=period[2], is_bot_Filter=None)
+                edges = self.exportData('edges', input_files_path + '\\' + period[0] + '_', 0, startDate_filter=period[1], endDate_filter=period[2], 
+                                        is_bot_Filter=None, replace_existing_file=False)
 
                 if bot_filter_fl == 'Y':
                     #export edges for this period, excluding edges associated with bots
                     print("** exporting edges for " + period[0] + "_ExcludingBots - "  + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    edges = self.exportData('edges', input_files_path + '\\' + period[0] + '_ExcludingBots_', 0, startDate_filter=period[1], endDate_filter=period[2], is_bot_Filter='0')
+                    edges = self.exportData('edges', input_files_path + '\\' + period[0] + '_ExcludingBots_', 0, startDate_filter=period[1], endDate_filter=period[2], 
+                                            is_bot_Filter='0', replace_existing_file=False)
 
                     #export edges for this period, only edges associated with bots        
                     print("** exporting edges for " + period[0] + "_BotsOnly - "  + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    edges = self.exportData('edges', input_files_path + '\\' + period[0] + '_BotsOnly_', 0, startDate_filter=period[1], endDate_filter=period[2], is_bot_Filter='1')
+                    edges = self.exportData('edges', input_files_path + '\\' + period[0] + '_BotsOnly_', 0, startDate_filter=period[1], endDate_filter=period[2], 
+                                            is_bot_Filter='1', replace_existing_file=False)
 
             
+            
+        print("*** END *** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+
+        
+        
             
     def nodes_edges_analysis_files(self, G, path):                        
         
         print("****** Exporting nodes and edges to file - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.export_nodes_edges_to_file(G, path + "\\G_NodesWithDegree.txt", path + "\\G_Edges.txt")
-        print("\n")
 
-        print("****** Ploting Nodes Wordcloud *********** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))        
+        print("****** Ploting Nodes Wordcloud - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))        
         node_file_name = path + '\\G_NodesWithDegree.txt'
         df = self.read_freq_list_file(node_file_name,' ')    
         self.plot_word_cloud(df, file=path +'\\G_Nodes_WordCloud.png')
@@ -198,77 +230,77 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
     
         #export text for topic analysis
         print("****** Exporting text for topic analysis - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    
-        self.exportData('text_for_topics', path + "\\" , 0, startDate_filter, endDate_filter, is_bot_Filter, arr_edges)
-        print("\n")
+        self.exportData('text_for_topics', path + "\\" , 0, startDate_filter, endDate_filter, is_bot_Filter, arr_edges, replace_existing_file=False)        
 
         # Train LDA models and print topics
         print("****** Topic discovery analysis (lda model) ****** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))        
-        topics_file_name = path + '\\T_tweetTextsForTopics.txt'        
         model_name = "Topics"
-        self.train_model_from_file(topics_file_name, num_of_topics, model_name)
-        self.plot_topics(path + '\\Topics-(LDA model).png', num_of_topics, 'lda')           
+        topics_file_name = path + '\\T_tweetTextsForTopics.txt'
+        if not os.path.exists(path + '\\Topics-(LDA model).png'):
+            self.train_model_from_file(topics_file_name, num_of_topics, model_name)
+            self.plot_topics(path + '\\Topics-(LDA model).png', num_of_topics, 'lda', replace_existing_file=False)
         
-
 
     def ht_analysis_files(self, path, startDate_filter=None, endDate_filter=None, is_bot_Filter=None, arr_edges=None):        
         
         #export ht frequency list         
-        print("****** Exporting ht frequency list - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        self.exportData('ht_frequency_list', path + "\\" , 0, startDate_filter, endDate_filter, is_bot_Filter, arr_edges)
-        print("\n")
-                
-
-        print("******************************************************")
-        print("****** Ploting HashTags Barchart and Wordcloud *********** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))                   
+        print("\n****** Exporting ht frequency list - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        self.exportData('ht_frequency_list', path + "\\" , 0, startDate_filter, endDate_filter, is_bot_Filter, arr_edges, replace_existing_file=False)        
+        
+        print("****** Ploting HashTags Barchart and Wordcloud - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))                   
         ht_file_name = path + '\\T_HT_FrequencyList.txt'
         
-        if os.stat(ht_file_name).st_size != 0:            
-            df = self.read_freq_list_file(ht_file_name)
-            self.plot_top_freq_list(df, 30, 'HashTag', exclude_top_no=0, file=path + '\\T_HT_Top30_BarChart.png')
-            self.plot_top_freq_list(df, 30, 'HashTag', exclude_top_no=1, file=path + '\\T_HT_Top30_BarChart-(Excluding Top1).png')
-            self.plot_top_freq_list(df, 30, 'HashTag', exclude_top_no=2, file=path + '\\T_HT_Top30_BarChart-(Excluding Top2).png')
-            self.plot_word_cloud(df, file=path + '\\T_HT_WordCloud.png')
+        if os.stat(ht_file_name).st_size != 0:                        
+            df = self.read_freq_list_file(ht_file_name)            
+            self.plot_top_freq_list(df, 30, 'HashTag', exclude_top_no=0, file=path + '\\T_HT_Top30_BarChart.png', replace_existing_file=False)
+            self.plot_top_freq_list(df, 30, 'HashTag', exclude_top_no=1, file=path + '\\T_HT_Top30_BarChart-(Excluding Top1).png', replace_existing_file=False)
+            self.plot_top_freq_list(df, 30, 'HashTag', exclude_top_no=2, file=path + '\\T_HT_Top30_BarChart-(Excluding Top2).png', replace_existing_file=False)
+            self.plot_word_cloud(df, file=path + '\\T_HT_WordCloud.png', replace_existing_file=False)
         
 
     def words_analysis_files(self, path, startDate_filter=None, endDate_filter=None, is_bot_Filter=None, arr_edges=None, top_no_word_filter=None):        
         
         #export words frequency list 
-        print("****** Exporting words frequency list - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))        
-        self.exportData('word_frequency_list', path + "\\" , 0, startDate_filter, endDate_filter, is_bot_Filter, arr_edges, top_no_word_filter)
-        print("\n")    
-
-        print("******************************************************")
-        print("****** Ploting Word Barchart and Wordcloud *********** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))                   
+        print("\n****** Exporting words frequency list - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))        
+        self.exportData('word_frequency_list', path + "\\" , 0, startDate_filter, endDate_filter, is_bot_Filter, arr_edges, top_no_word_filter, replace_existing_file=False)
+                        
+        print("****** Ploting Word Barchart and Wordcloud - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))                   
         word_file_name = path + '\\T_Words_FrequencyList.txt'
         if os.stat(word_file_name).st_size != 0:
             df = self.read_freq_list_file(word_file_name)
-            self.plot_top_freq_list(df, 30, 'Word', exclude_top_no=0, file=path+'\\T_Words_Top30_BarChart.png')    
-            self.plot_word_cloud(df, file=path+'\\T_Words_WordCloud.png')
+            self.plot_top_freq_list(df, 30, 'Word', exclude_top_no=0, file=path+'\\T_Words_Top30_BarChart.png', replace_existing_file=False)
+            self.plot_word_cloud(df, file=path+'\\T_Words_WordCloud.png', replace_existing_file=False)
         
         
     def time_series_files(self, path, startDate_filter=None, endDate_filter=None, is_bot_Filter=None, arr_edges=None):        
                           
-        print("****** Exporting time series files - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))   
-        #plot time series for all tweets
+        print("****** Exporting time series files - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))           
         tweet_df = self.get_time_series_df(startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
-        self.plot_timeseries(tweet_df, ['tweet', 'tweet_created_at'], path + '\\TS_TweetCount.png')   
         
-        #plot time series for top hashtags
-        self.plot_top_ht_timeseries(top_no_start=1, top_no_end=5, file = path + '\\TS_TweetCountByHT[1-5].png', startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
-        self.plot_top_ht_timeseries(top_no_start=3, top_no_end=10, file = path + '\\TS_TweetCountByHT[3-10].png', startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
-
+        #plot time series for all tweets
+        if not os.path.exists(path + '\\TS_TweetCount.png'):
+            self.plot_timeseries(tweet_df, ['tweet', 'tweet_created_at'], path + '\\TS_TweetCount.png')   
+        
+        #plot time series for top hashtags [1-5]
+        if not os.path.exists(path + '\\TS_TweetCountByHT[1-5].png'):
+            self.plot_top_ht_timeseries(top_no_start=1, top_no_end=5, file = path + '\\TS_TweetCountByHT[1-5].png', 
+                                        startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
             
+        #plot time series for top hashtags [3-10]
+        if not os.path.exists(path + '\\TS_TweetCountByHT[3-10].png'):
+            self.plot_top_ht_timeseries(top_no_start=3, top_no_end=10, file = path + '\\TS_TweetCountByHT[3-10].png', 
+                                        startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges)
+
+    
         
     def graph_analysis_files(self, G, path, graph_plot_cutoff_no_edges=1000, comty_contract_per=90):                    
     
-        #plot graph        
-        print("******************************************************")
-        print("****** Ploting graph... *********** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))                
+        #plot graph
+        print("\n****** Ploting graphs... *********** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
-        
-        if not os.path.exists(path + '\\Graph-(cutoff[' + str(graph_plot_cutoff_no_edges) + '].png') and not os.path.exists(path + '\\GraphOld-(cutoff[' + str(graph_plot_cutoff_no_edges) + '].png'):
+        if not os.path.exists(path + '\\Graph.png') and not os.path.exists(path + '\\Graph(WithoutScale).png'):
             if len(G.edges()) < 450:
-                v_scale = 0.01; v_k =0.7; v_iterations=50; v_node_size=2
+                v_scale = 0.01; v_k =0.7; v_iterations=100; v_node_size=2
             elif len(G.edges()) < 5000:
                 v_scale = 2; v_k = 0.6; v_iterations=200; v_node_size=0.8
             elif len(G.edges()) < 10000:
@@ -278,14 +310,11 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
 
             if len(G.edges()) <= graph_plot_cutoff_no_edges and len(G.edges()) != 0:   
                 G_to_plot, labels2, k = self.calculate_louvain_clustering(G)
-                self.plotSpringLayoutGraph(G_to_plot, path + '\\Graph-(cutoff[' + str(graph_plot_cutoff_no_edges) + '].png', v_scale, v_k, v_iterations, cluster_fl='Y', v_labels=list(list(labels2))
-                )
+                self.plotSpringLayoutGraph(G_to_plot, path + '\\Graph.png', v_scale, v_k, v_iterations, cluster_fl='Y', v_labels=list(list(labels2)), replace_existing_file=False)
                    
-                self.plotSpringLayoutGraph(G, path + '\\GraphOld-(cutoff[' + str(graph_plot_cutoff_no_edges) + '].png',
-                                           v_scale, v_k, v_iterations, cluster_fl='N', v_alpha=1, scale_node_size_fl='N' )
+                self.plotSpringLayoutGraph(G, path + '\\Graph(WithoutScale).png', v_scale, v_k, v_iterations, cluster_fl='N', v_alpha=1, scale_node_size_fl='N', replace_existing_file=False )
                     
                 
-
         #contracted        
         self.plot_graph_contracted_nodes(G, path + '\\Graph-(ContractedNodes).png', 
                                          graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
@@ -293,25 +322,29 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
         print("\n")
                         
 
+
     
     def edge_files_analysis(self, output_path, is_bot_Filter=None, period_arr=None, 
                       create_nodes_edges_files_flag='Y', create_graphs_files_flag='Y', create_topic_model_files_flag='Y', 
                       create_ht_frequency_files_flag='Y', create_words_frequency_files_flag='Y', create_timeseries_files_flag='Y',   
+                      create_top_nodes_files_flag = 'Y', create_community_files_flag = 'Y',
                       num_of_topics=4, top_no_word_filter=None, graph_plot_cutoff_no_edges=1000, comty_contract_per=90,
-                      top_degree_start=1, top_degree_end=10, period_top_degree_start=1, period_top_degree_end=5
-                     ):        
-                
+                      top_degree_start=1, top_degree_end=10, period_top_degree_start=1, period_top_degree_end=5, commty_edge_size_cutoff=200
+                     ):                        
         
         #Get the right edges file to inport
         if is_bot_Filter is None:
-            edge_file_path = self.folder_path + '\\data_input_files\\AllPeriods_edges.txt'
             parent_path = output_path + '\\All'
+            edge_file_path = self.folder_path + '\\data_input_files\\AllPeriods_edges.txt'            
+            if not os.path.exists(edge_file_path): self.export_all_edges_for_input(period_arr=period_arr)
         elif is_bot_Filter == '0':
-            edge_file_path = self.folder_path + '\\data_input_files\\AllPeriods_ExcludingBots_edges.txt'
             parent_path = output_path + '\\ExcludingBots'
+            edge_file_path = self.folder_path + '\\data_input_files\\AllPeriods_ExcludingBots_edges.txt'            
+            if not os.path.exists(edge_file_path): self.export_all_edges_for_input(period_arr=period_arr, bot_filter_fl='Y')
         elif is_bot_Filter == '1':
-            edge_file_path = self.folder_path + '\\data_input_files\\AllPeriods_BotsOnly_edges.txt'
             parent_path = output_path + '\\Bots_Edges_Only'
+            edge_file_path = self.folder_path + '\\data_input_files\\AllPeriods_BotsOnly_edges.txt'            
+            if not os.path.exists(edge_file_path): self.export_all_edges_for_input(period_arr=period_arr, bot_filter_fl='Y')
             
         self.create_path(output_path)
             
@@ -325,16 +358,19 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                                create_ht_frequency_files_flag=create_ht_frequency_files_flag, 
                                create_words_frequency_files_flag=create_words_frequency_files_flag,  
                                create_timeseries_files_flag=create_timeseries_files_flag,
+                               create_top_nodes_files_flag=create_top_nodes_files_flag, 
+                               create_community_files_flag=create_community_files_flag,
                                startDate_filter=None, 
                                endDate_filter=None, 
                                graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
                                comty_contract_per=comty_contract_per,
                                top_no_word_filter=top_no_word_filter,                                       
                                top_degree_start=top_degree_start, 
-                               top_degree_end=top_degree_end
+                               top_degree_end=top_degree_end,
+                               commty_edge_size_cutoff=commty_edge_size_cutoff
                                )
         
-                                        
+          
         #run analysis by period using the dates set on array period_arr
         if period_arr is not None:                                    
             
@@ -351,19 +387,22 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                 period_start_date = period[1]
                 period_end_date = period[2]
 
-                print("**********************************************************")
+                print("\n**********************************************************")
                 print("************************** " + period_name + " ****************************\n" ) 
 
                 #edge file path 
                 if is_bot_Filter is None:
                     parent_path = output_path + "\\All_By_Period\\" + period_name
                     edge_file_path = output_path + "\\data_input_files\\" + period_name +"_edges.txt"    
+                    if not os.path.exists(edge_file_path): self.export_all_edges_for_input(period_arr=period_arr)
                 elif is_bot_Filter  == '0':
                     parent_path = output_path + "\\Excluding_Bots_By_Period\\" + period_name
-                    edge_file_path = output_path + "\\data_input_files\\" + period_name +"_ExcludingBots_edges.txt"                
+                    edge_file_path = output_path + "\\data_input_files\\" + period_name +"_ExcludingBots_edges.txt"
+                    if not os.path.exists(edge_file_path): self.export_all_edges_for_input(period_arr=period_arr, bot_filter_fl='Y')
                 elif is_bot_Filter  == '1':
                     parent_path = output_path + "\\Bots_Edges_Only_By_Period\\" + period_name
-                    edge_file_path = output_path + "\\data_input_files\\" + period_name +"_BotsOnly_edges.txt"                
+                    edge_file_path = output_path + "\\data_input_files\\" + period_name +"_BotsOnly_edges.txt"
+                    if not os.path.exists(edge_file_path): self.export_all_edges_for_input(period_arr=period_arr, bot_filter_fl='Y')
 
                 self.create_path(parent_path)        
 
@@ -379,27 +418,30 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                                        create_ht_frequency_files_flag=create_ht_frequency_files_flag, 
                                        create_words_frequency_files_flag=create_words_frequency_files_flag,   
                                        create_timeseries_files_flag=create_timeseries_files_flag,
+                                       create_top_nodes_files_flag=create_top_nodes_files_flag, 
+                                       create_community_files_flag=create_community_files_flag,
                                        startDate_filter=period_start_date, 
                                        endDate_filter=period_end_date, 
                                        graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
                                        comty_contract_per=comty_contract_per,
                                        top_no_word_filter=top_no_word_filter,                                       
-                                       top_degree_start=period_top_degree_start, top_degree_end=period_top_degree_end
+                                       top_degree_start=period_top_degree_start, top_degree_end=period_top_degree_end,
+                                       commty_edge_size_cutoff=commty_edge_size_cutoff
                                        )
         
             
                     
+
     def all_analysis_file(self, G, output_path, num_of_topics=4, is_bot_Filter=None,
                           create_nodes_edges_files_flag='Y', create_graphs_files_flag='Y', create_topic_model_files_flag='Y', 
                           create_ht_frequency_files_flag='Y', create_words_frequency_files_flag='Y', create_timeseries_files_flag='Y',                         
+                          create_top_nodes_files_flag = 'Y', create_community_files_flag = 'Y',
                           startDate_filter=None, endDate_filter=None, graph_plot_cutoff_no_edges=1000, comty_contract_per=90,
-                          top_no_word_filter=None, top_degree_start = 1, top_degree_end = 10
-                         ):
+                          top_no_word_filter=None, top_degree_start = 1, top_degree_end = 10, commty_edge_size_cutoff=200
+                         ):                        
         
-        print("all_analysis_file" + output_path)
-        
-        
-        #files for the main graph
+
+        #files for the main graph            
         self.create_analysis_file(G, output_path, 
                                   num_of_topics, 
                                   create_nodes_edges_files_flag, 
@@ -414,30 +456,53 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                                   graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
                                   comty_contract_per=comty_contract_per,
                                   top_no_word_filter=top_no_word_filter
-                         )
-        
-        #files for the top nodes        
-        self.top_nodes_analysis( G, output_path, num_of_topics, 
-                                create_nodes_edges_files_flag=create_nodes_edges_files_flag, 
-                                create_graphs_files_flag=create_graphs_files_flag, 
-                                create_topic_model_files_flag=create_topic_model_files_flag, 
-                                create_ht_frequency_files_flag=create_ht_frequency_files_flag, 
-                                create_words_frequency_files_flag=create_words_frequency_files_flag, 
-                                create_timeseries_files_flag=create_timeseries_files_flag,
-                                startDate_filter=startDate_filter, 
-                                endDate_filter=endDate_filter, 
-                                is_bot_Filter=is_bot_Filter, 
-                                graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
-                                comty_contract_per=comty_contract_per, 
-                                top_no_word_filter=top_no_word_filter,
-                                top_degree_start=top_degree_start, 
-                                top_degree_end=top_degree_end
-                         )
+                         )        
+
         
         
-    
-    
-    
+        #files for the top nodes
+        if create_top_nodes_files_flag == 'Y':            
+            self.top_nodes_analysis( G, output_path, num_of_topics, 
+                                    create_nodes_edges_files_flag=create_nodes_edges_files_flag, 
+                                    create_graphs_files_flag=create_graphs_files_flag, 
+                                    create_topic_model_files_flag=create_topic_model_files_flag, 
+                                    create_ht_frequency_files_flag=create_ht_frequency_files_flag, 
+                                    create_words_frequency_files_flag=create_words_frequency_files_flag, 
+                                    create_timeseries_files_flag=create_timeseries_files_flag,
+                                    startDate_filter=startDate_filter, 
+                                    endDate_filter=endDate_filter, 
+                                    is_bot_Filter=is_bot_Filter, 
+                                    graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
+                                    comty_contract_per=comty_contract_per, 
+                                    top_no_word_filter=top_no_word_filter,
+                                    top_degree_start=top_degree_start, 
+                                    top_degree_end=top_degree_end
+                             )
+        
+        #files for community nodes
+        if create_community_files_flag == 'Y':
+            self.commty_analysis_files( G, output_path, num_of_topics, 
+                                    create_nodes_edges_files_flag=create_nodes_edges_files_flag, 
+                                    create_graphs_files_flag=create_graphs_files_flag, 
+                                    create_topic_model_files_flag=create_topic_model_files_flag, 
+                                    create_ht_frequency_files_flag=create_ht_frequency_files_flag, 
+                                    create_words_frequency_files_flag=create_words_frequency_files_flag, 
+                                    create_timeseries_files_flag=create_timeseries_files_flag,
+                                    startDate_filter=startDate_filter, 
+                                    endDate_filter=endDate_filter, 
+                                    is_bot_Filter=is_bot_Filter, 
+                                    graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
+                                    comty_contract_per=comty_contract_per, 
+                                    top_no_word_filter=top_no_word_filter,
+                                    top_degree_start=top_degree_start, 
+                                    top_degree_end=top_degree_end,
+                                    commty_edge_size_cutoff=commty_edge_size_cutoff
+                             )
+
+        
+
+
+        
     def create_analysis_file(self, G, output_path, num_of_topics, 
                           create_nodes_edges_files_flag, create_graphs_files_flag, create_topic_model_files_flag, 
                           create_ht_frequency_files_flag, create_words_frequency_files_flag, create_timeseries_files_flag,                         
@@ -446,17 +511,16 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                          ):
                         
         
-        #create graph from edge file
-        #G = self.loadGraphFromFile(edge_file_path)
-        
         #export file with measures
+        print("****** Graph Measures - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.print_Measures(G, fileName_to_print = output_path + "\\G_Measures-(All).txt")
         print("\n")
 
 
-        if len(G.edges) != 0:       
+        if len(G.edges()) != 0:
             #get largest connected component and export file with measures
             G = self.largest_component_no_self_loops(G)
+            print("****** Largest Component Graph Measures - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             self.print_Measures(G, fileName_to_print = output_path + "\\G_Measures-(LargestCC).txt")
             print("\n")
 
@@ -474,7 +538,8 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                 
             #export words frequency list 
             if create_words_frequency_files_flag == 'Y':
-                self.words_analysis_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, is_bot_Filter=is_bot_Filter, arr_edges=arr_edges, top_no_word_filter=top_no_word_filter)
+                self.words_analysis_files(output_path, startDate_filter=startDate_filter, endDate_filter=endDate_filter, 
+                                          is_bot_Filter=is_bot_Filter, arr_edges=arr_edges, top_no_word_filter=top_no_word_filter)
                                  
             #plot graph
             if create_graphs_files_flag == 'Y':
@@ -515,13 +580,11 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
             #creates a path to add the files for this node
             path_node = path + "\\" + str(i) + "-" + node
             self.create_path(output_path + '\\' + path_node)
-
+                        
             
-            print(path_node + '\\G_subgraph_' + node + '_Measures.txt')
-            
-            print("******************************************************")
-            print("****** Printing measures for G_subgraph_" + node)
-            self.print_Measures(G_subgraph, False, False, False, False, fileName_to_print = path_node + '\\G_subgraph_' + node + '_Measures.txt')    
+            print("\n******************************************************")
+            print("****** Printing files for G_subgraph_" + node)
+            #self.print_Measures(G_subgraph, False, False, False, False, fileName_to_print = path_node + '\\G_subgraph_' + node + '_Measures.txt')    
             print("\n")
             
             
@@ -544,7 +607,88 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
                                       top_no_word_filter=top_no_word_filter)
             i -= 1
             
+            
 
+
+            
+
+    def commty_analysis_files(self, G, output_path, num_of_topics, 
+                          create_nodes_edges_files_flag, create_graphs_files_flag, create_topic_model_files_flag, 
+                          create_ht_frequency_files_flag, create_words_frequency_files_flag, create_timeseries_files_flag,                        
+                          startDate_filter=None, endDate_filter=None, is_bot_Filter=None, 
+                          graph_plot_cutoff_no_edges=1000, comty_contract_per=90, top_no_word_filter=None,
+                          top_degree_start = 1, top_degree_end = 10, commty_edge_size_cutoff=200
+                         ):
+        
+        print("\n******************************************************")
+        print("******** Louvain Communities ********")
+                            
+        if len(G.edges()) != 0:                                                
+            
+            # Choose which graph you want to run this for
+            Graph_to_analyze = G.copy()            
+            
+            #creates a folder to save the files for this analysis
+            path = output_path + "\\Communities_(Louvain)"
+            while os.path.exists(path):            
+                path = path + "+"                        
+            self.create_path(path)                        
+
+            #calculate louvain community for largest connected component
+            Graph_to_analyze = self.largest_component_no_self_loops(Graph_to_analyze) 
+            Graph_to_analyze, labels, k = self.calculate_louvain_clustering(Graph_to_analyze)            
+            
+            comm_att = 'community_louvain'
+
+            #find the number of communities in the graph
+            no_of_comm = max(nx.get_node_attributes(Graph_to_analyze, comm_att).values())+1    
+
+            print("******************************************************")
+            print("Total # of Communities " + str(no_of_comm))
+
+            #loop through the communities print they analysis files
+            for commty in range(no_of_comm):
+
+                #find subgraphs of this community
+                G_subgraph = Graph_to_analyze.subgraph([n for n,attrdict in Graph_to_analyze.node.items() if attrdict [comm_att] == commty ])                                                
+                #only cares about communities with more than 1 node
+                if len(G_subgraph.edges()) >= commty_edge_size_cutoff:
+
+                    G_subgraph_largestComponent = G_subgraph.copy()
+                    G_subgraph_largestComponent = self.largest_component_no_self_loops(G_subgraph_largestComponent)
+
+                    #creates a path to add the files for this node
+                    path_community = path + "\\Community-" + str(commty+1)
+                    self.create_path(path_community)
+
+                    print("\n")
+                    print("******************************************************")
+                    print("****** Printing files for community " + str(commty+1) + " ******")
+                    #self.print_Measures(G_subgraph, False, False, False, False, fileName_to_print = path_community + '\\G_' + str(commty+1) + '_Measures.txt')    
+                    print("\n")
+
+                    arr_edges = self.concat_edges(G_subgraph)            
+                    self.create_analysis_file(G_subgraph, path_community, 
+                                              num_of_topics=num_of_topics, 
+                                              create_nodes_edges_files_flag=create_nodes_edges_files_flag, 
+                                              create_graphs_files_flag=create_graphs_files_flag, 
+                                              create_topic_model_files_flag=create_topic_model_files_flag, 
+                                              create_ht_frequency_files_flag=create_ht_frequency_files_flag, 
+                                              create_words_frequency_files_flag=create_words_frequency_files_flag, 
+                                              create_timeseries_files_flag=create_timeseries_files_flag,
+                                              startDate_filter=startDate_filter, 
+                                              endDate_filter=endDate_filter, 
+                                              is_bot_Filter=is_bot_Filter, 
+                                              arr_edges=arr_edges, 
+                                              graph_plot_cutoff_no_edges=graph_plot_cutoff_no_edges, 
+                                              comty_contract_per=comty_contract_per,
+                                              top_no_word_filter=top_no_word_filter)
+            
+                        
+    
+    
+                
+       
                         
                 
                         
@@ -581,6 +725,7 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
 
 
         return df
+
 
 
     
@@ -637,11 +782,91 @@ class tw_analysis(tw_graph, tw_database, tw_topics):
        
 
     def eda_analysis(self):
-                
+               
+        eda_folder =  self.folder_path  + '\\EDA'
+        self.create_path(eda_folder)                    
+        eda_file = open(eda_folder + '\\EDA.txt', 'w', encoding="utf-8")
+                    
+            
+        print("**** Tweet counts ******")
+        eda_file.write("**** Tweet counts ******\n")
+        arr, f = self.queryData(exportType='tweetCount', filepath='', inc=0)
+        for x in arr:           
+            eda_file.write(str(x))
+            eda_file.write("\n")
+        df = pd.DataFrame(arr)
+        df.columns = ['', '']
+        print(df.to_string())
+        print("\n")
+
+
+        print("**** Tweet counts by language ******")           
+        eda_file.write("\n**** Tweet counts by language ******\n")
+        arr, f = self.queryData(exportType='tweetCountByLanguage', filepath='', inc=0)
+        for x in arr:
+            eda_file.write(str(x))
+            eda_file.write("\n")
+        df = pd.DataFrame(arr)
+        df.columns = ['', '']
+        print(df.to_string())
+        print("\n")
+        
+        
+        print("**** Tweet counts by month ******")    
+        eda_file.write("\n**** Tweet counts by month ******\n")
+        arr, f = self.queryData(exportType='tweetCountByMonth', filepath='', inc=0)
+        for x in arr:
+            eda_file.write(str(x))
+            eda_file.write("\n")
+        df = pd.DataFrame(arr)
+        df.columns = ['', '', '']
+        print(df.to_string())
+        print("\n")   
+        
+        
+        print("**** Tweet counts by file ******")    
+        eda_file.write("\n**** Tweet counts by file ******\n")
+        arr, f = self.queryData(exportType='tweetCountByFile', filepath='', inc=0)
+        for x in arr:
+            eda_file.write(str(x))
+            eda_file.write("\n")
+        df = pd.DataFrame(arr)
+        df.columns = ['', ''] 
+        print(df.to_string())
+        print("\n")                  
+ 
+
+        print("**** User counts ******")    
+        eda_file.write("\n**** User counts ******\n")
+        arr, f = self.queryData(exportType='userCount', filepath='', inc=0)
+        arr.sort()
+        for x in arr:
+            eda_file.write(str(x))
+            eda_file.write("\n")
+        df = pd.DataFrame(arr)
+        df.columns = ['', '', '', '']
+        print(df.to_string())
+        print("\n")
+                    
+        #close file
+        eda_file.close()
+
+            
+        #load graph from main edges file
         edge_file_path = self.folder_path + '\\data_input_files\\AllPeriods_edges.txt'
         G = self.loadGraphFromFile(edge_file_path)
-        
-        self.plot_disconnected_graph_distr(G, file=self.folder_path + '\\EDA.png')
-        
-        
+                
             
+        #plot distribution of the separate connected components
+        print("**** Connected Components - Distribution ******") 
+        self.plot_disconnected_graph_distr(G, file=eda_folder + '\\ConnectedComponents-(Graphs).png')        
+        
+        
+        #calculate louvein community clustering
+        print("**** Calculating Community Distribution - (Louvain) ******") 
+        G2 = self.largest_component_no_self_loops(G) 
+        G2, labels, k = self.calculate_louvain_clustering(G2)
+        self.plot_graph_att_distr(G2,'community_louvain',title='Louvain Community Distribution for Largest Connected Component',file_name=eda_folder+'\\community_louvain_dist.png')
+
+
+        print("*** EDA - END *** - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))

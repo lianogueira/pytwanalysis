@@ -119,8 +119,8 @@ class tw_topics:
     def train_model(self, topic_docs, num_topics, model_name, blnSaveinDB=False, blnSaveTrainedModelFiles=False, txtFileName=None,
                     model_type='both', lda_num_of_iterations=150, delete_stop_words=True, lemmatize_words=True, delete_numbers=True):
         
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing train_model... Started at: " + starttime )        
+        #starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #print("Executing train_model... Started at: " + starttime )        
 
         doc_clean = [self.clean(doc, delete_numbers, delete_stop_words, lemmatize_words).split() for doc in topic_docs]
 
@@ -208,8 +208,8 @@ class tw_topics:
             self.dictionary.save(self.folder_path + "/trained_models/" + model_name + "_dictionary.dict")
         
         
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing train_model. Ended at: " + endtime)
+        #endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #print("Finished executing train_model. Ended at: " + endtime)
     
 
     #train model from file
@@ -223,36 +223,34 @@ class tw_topics:
         
     
     #plot graph with lda topics
-    def plot_topics(self, file_name, no_of_topics, model_type = 'lda', fig_size_x = 17, fig_size_y=15 ):
+    def plot_topics(self, file_name, no_of_topics, model_type = 'lda', fig_size_x = 17, fig_size_y=15, replace_existing_file=True):
         
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing plot_topics... Started at: " + starttime )
-                
-        fig_size_y = 7*(no_of_topics/2)        
-        fiz=plt.figure(figsize=(fig_size_x, fig_size_y))
         
-        for i in range(no_of_topics):
-            if model_type == 'lda':
-                df=pd.DataFrame(self.lda_model.show_topic(i), columns=['term','prob']).set_index('term')        
-            elif model_type == 'lsi':
-                df=pd.DataFrame(self.lsi_model.show_topic(i), columns=['term','prob']).set_index('term')        
+        if replace_existing_file==True or not os.path.exists(file_name):
                 
-            no_rows = int(no_of_topics/2)+no_of_topics%2            
-            plt.subplot(no_rows,2,i+1)
-            plt.title('topic '+str(i+1))
-            sns.barplot(x='prob', y=df.index, data=df, label='Cities', palette='Reds_d')
-            plt.xlabel('probability')
+            fig_size_y = 7*(no_of_topics/2)        
+            fiz=plt.figure(figsize=(fig_size_x, fig_size_y))
 
-        plt.savefig(file_name, dpi=200, facecolor='w', edgecolor='w')
-        #plt.show()
-        plt.cla()   # Clear axis
-        plt.clf()   # Clear figure
-        plt.close() # Close a figure window
+            for i in range(no_of_topics):
+                if model_type == 'lda':
+                    df=pd.DataFrame(self.lda_model.show_topic(i), columns=['term','prob']).set_index('term')        
+                elif model_type == 'lsi':
+                    df=pd.DataFrame(self.lsi_model.show_topic(i), columns=['term','prob']).set_index('term')        
 
-    
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing plot_topics. Ended at: " + endtime)    
-    
+                no_rows = int(no_of_topics/2)+no_of_topics%2            
+                plt.subplot(no_rows,2,i+1)
+                plt.title('topic '+str(i+1))
+                sns.barplot(x='prob', y=df.index, data=df, label='Cities', palette='Reds_d')
+                plt.xlabel('probability')
+
+            #save the file 
+            plt.savefig(file_name, dpi=200, facecolor='w', edgecolor='w')
+
+            #plt.show()
+            plt.cla()   # Clear axis
+            plt.clf()   # Clear figure
+            plt.close() # Close a figure window
+                
 
     
     # read a frequency list into a pandas objects
@@ -267,11 +265,8 @@ class tw_topics:
     
     
     #plot a bar graph with the top frequency list
-    def plot_top_freq_list(self, fr_list, top_no, ylabel, exclude_top_no=0, file=None):
-        
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing plot_top_freq_list... Started at: " + starttime )
-                
+    def plot_top_freq_list(self, fr_list, top_no, ylabel, exclude_top_no=0, file=None, replace_existing_file= True):
+                        
         if exclude_top_no != 0:
             fr_list = fr_list.iloc[exclude_top_no:]
         
@@ -287,30 +282,25 @@ class tw_topics:
 
         
         fr_list_gr = fr_list.groupby("word")
-    
-        #plt.figure(figsize=(12,12))
-        plt.figure(figsize=(12, len(fr_list)/2.5))        
-        #fr_list_gr.max().sort_values(by="freq",ascending=False)["freq"].plot.bar()
+            
+        plt.figure(figsize=(12, len(fr_list)/2.5))                
         fr_list_gr.max().sort_values(by="freq",ascending=True)["freq"].plot.barh()
         plt.xticks(rotation=50)
         plt.xlabel("Frequency")
         plt.ylabel(ylabel)
         if file != None:
-            plt.savefig(file, dpi=300, bbox_inches='tight')
+            if replace_existing_file==True or not os.path.exists(file):
+                plt.savefig(file, dpi=300, bbox_inches='tight')
+                
         #plt.show()
         plt.cla()   # Clear axis
         plt.clf()   # Clear figure
-        plt.close() # Close a figure window        
-        
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing plot_top_freq_list. Ended at: " + endtime)    
+        plt.close() # Close a figure window
+                
         
     
     #plot a word cloudfor a frequency list
-    def plot_word_cloud(self, fr_list, file=None):
-        
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing plot_word_cloud... Started at: " + starttime )
+    def plot_word_cloud(self, fr_list, file=None, replace_existing_file=True):                
         
         wordcount = collections.defaultdict(int)
 
@@ -327,16 +317,14 @@ class tw_topics:
         plt.axis("off")
         
         if file is not None:
-            plt.savefig(str(file), dpi=300)
+            if replace_existing_file==True or not os.path.exists(file):
+                plt.savefig(str(file), dpi=300)
                         
         #plt.show()            
         plt.cla()   # Clear axis
         plt.clf()   # Clear figure
         plt.close() # Close a figure window
-        
-        
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing plot_word_cloud. Ended at: " + endtime)    
+                        
 
     
     #load existing model from file

@@ -202,7 +202,7 @@ class tw_database:
     def loadCollection_UpdateStatus(self, collection_name, inc, type_filter=None):
 
         starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print ('loading process started (' + collection_name + ')... ' + starttime)
+        print ('loading process started (' + collection_name + ('-' + type_filter if type_filter is not None else '')  +  ')... ' + starttime)
             
         last_seq_no = -1
         max_seq_no = 0
@@ -1081,7 +1081,7 @@ class tw_database:
     #Parameters:  aggType = the type of aggreagation you want to run - (Options: tweetCountByFile, hashtagCount, tweetCountByLanguageAgg, tweetCountByMonthAgg, tweetCountByUser)
     def loadAggregations(self, aggType):
     
-        print ("loading process started....")
+        print ("loading " + aggType + " process started....")
         
         if (aggType == 'tweetCountByFile'):
             self.tweetCountByFileAgg()
@@ -1094,9 +1094,9 @@ class tw_database:
         elif (aggType == 'tweetCountByUser'):
             self.tweetCountByUser()    
             
-        print ("loading process completed.")
+        print ("loading " + aggType + " process completed.")
 
-                
+
     #load aggregation on tweetCountByFileAgg collection
     def tweetCountByFileAgg(self):
     
@@ -1104,14 +1104,15 @@ class tw_database:
         result = self.c_tweetCountByFileAgg.delete_many({}) 
         select_cTweet = self.c_tweet.aggregate( [{"$group": {"_id": {"file_path": "$file_path"}, "count": { "$sum": 1 } } } ])
 
-        for tweetCount in select_cTweet:
+        for tweetCount in select_cTweet:            
             try:        
-                data = '{"file_path":"' + tweetCount["_id"]["file_path"] + \
-                '", "count":"' + str(tweetCount["count"]) + '"}'                
+                if tweetCount["_id"]["file_path"] is not None:
+                    data = '{"file_path":"' + tweetCount["_id"]["file_path"] + \
+                    '", "count":"' + str(tweetCount["count"]) + '"}'                
 
-                x = json.loads(data)
-                result = self.c_tweetCountByFileAgg.insert_one(x)
-                
+                    x = json.loads(data)
+                    result = self.c_tweetCountByFileAgg.insert_one(x)
+
             except Exception as e:            
                 print("Error running aggregation: tweetCountByFile | " +str(e))
                 continue                 
@@ -1261,6 +1262,8 @@ class tw_database:
     #             inc = how many tweets we want to update at the time for field is_bot_connection. Default=10000 (High number might take too long to run)
     def set_bot_flag_based_on_arr(self, bots_list_id_str, inc=10000):
         
+        print("updating bot flag...")
+        
         # set all records to be is_bot = 0 at first
         self.c_users.update_many({}, {"$set": {"is_bot": "0"}})
         self.c_tweetConnections.update_many({}, {"$set": {"is_bot": "0"}})
@@ -1292,6 +1295,8 @@ class tw_database:
         self.c_focusedTweet.update_many({'id_str': {'$in': arr_bot_conn}}, {'$set': {'is_bot_connection':'1'}})
         # **************************** 
             
+        print("updating bot flag completed")
+        
 
     #build filter for queries
     def build_filter(self, startDate_filter=None, endDate_filter=None, is_bot_Filter=None, ht_to_filter=None):
@@ -1339,12 +1344,61 @@ class tw_database:
     #####################################          
     # Exports data into \t delimited file
     def exportData(self, exportType, filepath, inc, 
-                   startDate_filter=None, endDate_filter=None, is_bot_Filter=None, arr_edges=None, top_no_filter=None, ht_to_filter=None, include_hashsymb_FL='Y'):
+                   startDate_filter=None, endDate_filter=None, is_bot_Filter=None, arr_edges=None, top_no_filter=None, ht_to_filter=None, include_hashsymb_FL='Y', replace_existing_file=True):
+                
+        #export edges   
+        if (exportType == 'edges'):        
+            file = filepath + 'edges.txt'            
+        #export text for topic analysis
+        elif (exportType == 'text_for_topics'):                                                                              
+            file = filepath + 'T_tweetTextsForTopics.txt'                        
+        #export ht frequency list
+        elif (exportType == 'ht_frequency_list'):                            
+            file = filepath + 'T_HT_FrequencyList.txt'                        
+        #export words frequency list - (TOP 5000)
+        elif (exportType == 'word_frequency_list'):                            
+            file = filepath + 'T_Words_FrequencyList.txt'            
+        #export text for topic analysis
+        elif (exportType == 'tweet_ids_timeseries'):                                                                              
+            file = filepath + 'T_tweetIdswithDates.txt'                        
+        #export tweetCountByUser
+        elif (exportType == 'tweetCount'):
+            file = filepath + 'tweetCount.txt'                                    
+        #export tweetCountByUser
+        elif (exportType == 'userCount'):            
+            file = filepath + 'userCount.txt'
+        #export tweetCountByUser
+        elif (exportType == 'tweetCountByUser'):            
+            file = filepath + 'tweetCountByUser.txt'                                
+        #export tweetCountByLanguage
+        elif (exportType == 'tweetCountByLanguage'):
+            file = filepath + '\\tweetCountByLanguage.txt'                                        
+        #export tweetCountByFile
+        elif (exportType == 'tweetCountByFile'):
+            file = filepath + 'tweetCountByFile.txt'
+        #export tweetCountByMonth
+        elif (exportType == 'tweetCountByMonth'):          
+            file = filepath + 'tweetCountByMonth.txt'        
+        #export hashtagCount
+        elif (exportType == 'hashtagCount'): 
+            file = filepath + 'hashtagCount.txt'
+        #export topics by hashtag
+        elif (exportType == 'topicByHashtag'): 
+            file = filepath + 'topicByHashtag.txt'            
+        #export tweetTextAndPeriod
+        #if (exportType == 'tweetTextAndPeriod'):                                
+        #export tweetDetails
+        #if (exportType == 'tweetDetails'):                
+        #export words
+        #if (exportType == 'wordsOnEachTweet'):  
+        #user details on Each Tweet
+        #if (exportType == 'userDetailsOnEachTweet'):        
         
-        arr, file = self.queryData(exportType, filepath, inc, startDate_filter, endDate_filter, is_bot_Filter, arr_edges, top_no_filter, ht_to_filter)
+        if replace_existing_file==True or not os.path.exists(file):
+            arr, file = self.queryData(exportType, filepath, inc, startDate_filter, endDate_filter, is_bot_Filter, arr_edges, top_no_filter, ht_to_filter)
     
-        #export in array into txt file
-        self.exportToFile(arr, file)
+            #export in array into txt file
+            self.exportToFile(arr, file)
         
         
 
@@ -1643,6 +1697,65 @@ class tw_database:
             file = filepath + 'T_tweetIdswithDates.txt'
             
             
+        #export tweetCountByUser
+        if (exportType == 'tweetCount'):
+            
+            total_tweets = 0    
+            total_retweets = 0
+            total_replies = 0
+
+            select_cTweet = self.c_focusedTweet.aggregate([{"$match" : {"retweeted_text" : {"$ne": ""} }}, 
+                                                           {"$group": {"_id": {"seq_agg": "$seq_agg"}, "count": { "$sum": 1 } } } ])
+            for tweetCount in select_cTweet:   
+                total_retweets = tweetCount["count"]     
+
+
+            select_cTweet = self.c_focusedTweet.aggregate([{"$group": {"_id": {"seq_agg": "$seq_agg"}, "count": { "$sum": 1 } } } ])
+            for tweetCount in select_cTweet:            
+                total_tweets = tweetCount["count"]
+
+
+            select_cTweet = self.c_focusedTweet.aggregate([{"$match" : {"in_reply_to_screen_name" : {"$ne": "None"} }}, 
+                                                           {"$group": {"_id": {"seq_agg": "$seq_agg"}, "count": { "$sum": 1 } } } ])
+            for tweetCount in select_cTweet:            
+                total_replies = tweetCount["count"]
+
+            arr.append([ 'Total Original Tweets', str(total_tweets-total_retweets-total_replies)])
+            arr.append([ 'Total Replies', str(total_replies)])
+            arr.append([ 'Total Retweets', str(total_retweets)])
+            arr.append([ 'Total Tweets', str(total_tweets)])
+
+            #set file path
+            file = filepath + 'tweetCount.txt'
+            
+            
+            
+        #export tweetCountByUser
+        if (exportType == 'userCount'):
+                                   
+            tweet_user_count = 0
+            reply_user_count = 0
+            quote_user_count = 0
+            retweet_user_count = 0
+
+            select_cTweet = self.c_users.aggregate( [{"$group": {"_id": {"user_type": "$user_type"}, "count": { "$sum": 1 } } } ])
+            for tweetCount in select_cTweet:                   
+                if tweetCount["_id"]["user_type"] == 'tweet':
+                    arr.append([ '1', tweetCount["_id"]["user_type"], 'Users with at least one document in this db', str(tweetCount["count"]) ])                                
+                elif tweetCount["_id"]["user_type"] == 'retweet':
+                    arr.append([ '2', tweetCount["_id"]["user_type"], 'Users that were retweeted, but are not part of previous group', str(tweetCount["count"]) ])
+                elif tweetCount["_id"]["user_type"] == 'quote':
+                    arr.append([ '3', tweetCount["_id"]["user_type"], 'Users that were quote, but are not part of previous groups', str(tweetCount["count"]) ])                
+                elif tweetCount["_id"]["user_type"] == 'reply':
+                    arr.append([ '4', tweetCount["_id"]["user_type"], 'Users that were replied to, but are not part of previous groups', str(tweetCount["count"]) ])
+                elif tweetCount["_id"]["user_type"] == 'mention':
+                    arr.append([ '5', tweetCount["_id"]["user_type"], 'Users that were mentioned, but are not part of previous groups', str(tweetCount["count"]) ])
+                else:
+                    arr.append([ '6', tweetCount["_id"]["user_type"], '', str(tweetCount["count"]) ])    
+            
+            #set file path
+            file = filepath + 'userCount.txt'
+            
         
 
         #export tweetCountByUser
@@ -1671,7 +1784,7 @@ class tw_database:
             #get data from database and loop through records and insert into array
             select_tweetCountByLang = self.c_tweetCountByLanguageAgg.find()        
             for x in select_tweetCountByLang:
-                arr.append([ x['lang'],  x['count']])        
+                arr.append([ x['lang'],  x['count']])
 
             #set file path
             file = filepath + '\\tweetCountByLanguage.txt'
