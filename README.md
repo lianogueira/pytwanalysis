@@ -1,15 +1,15 @@
-# pyTwitterAnalysis
-A tool to gather, discover, and analyze Twitter data using a combinations of graph-clustering and topic modeling techniques with the goal of semantically grouping tweet messages together. 
+# pytwanalysis - (Twitter Analysis)
+A tool to gather, discover, and analyze Twitter data using a combination of graph-clustering and topic modeling techniques with the goal of semantically grouping tweet messages together. 
 
 #### **Installation**
 
 ```
-pip install pyTwitterAnalysis
+pip install pytwanalysis
 ```
 
 #### **Initializing an object**
 ```
-import pyTwitterAnalysis as ta
+import pytwanalysis as ta
 ```
 
 ```
@@ -24,7 +24,7 @@ BASE_PATH = '[youFolderPath]' #path where you want to save your files
 ```
 
 ```
-x = ta.tw_analysis(BASE_PATH, db)
+x = ta.TwitterAnalysis(BASE_PATH, db)
 ```
 
 
@@ -65,6 +65,7 @@ x = ta.tw_analysis(BASE_PATH, db)
  pip install wordcloud
  pip install Pyphen
 ```
+ 
  
  #### **Things you can do with this library:**
  + Use mongoDB to store and process your Twitter data

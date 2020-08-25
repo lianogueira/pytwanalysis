@@ -43,7 +43,7 @@ lemma = WordNetLemmatizer()
 #lda_model = ""
 
 
-class tw_topics:   
+class TwitterTopics:   
 
     def __init__(self, folder_path, mongoDB_database=None):
                     
