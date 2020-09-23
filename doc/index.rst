@@ -1,80 +1,41 @@
-# pytwanalysis - (Twitter Analysis)
-A tool to gather, discover, and analyze Twitter data using a combination of graph-clustering and topic modeling techniques with the goal of semantically grouping tweet messages together. 
+.. pytwanalysis documentation master file, created by
+   sphinx-quickstart on Tue Sep  1 14:38:26 2020.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
 
-#### **Installation**
+Welcome to pytwanalysis's documentation!
+========================================
 
-```
-pip install pytwanalysis
-```
-
-#### **Initializing an object**
-```
-import pytwanalysis as ta
-```
-
-```
-#set up your mongoDB connection here
-mongoDBConnectionSTR = "mongodb://localhost:27017"
-client = MongoClient(mongoDBConnectionSTR)
-db = client.yourDB #chose your DB name here
-```
-
-```
-BASE_PATH = '[youFolderPath]' #path where you want to save your files
-```
-
-```
-x = ta.TwitterAnalysis(BASE_PATH, db)
-```
+A tool to gather, discover, and analyze Twitter data using a combination of graph-clustering and topic modeling techniques with the goal of semantically grouping tweet messages together.
 
 
-#### **Requirements:**
-1. Python 3.7
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
 
-2. **Database**: MongoDB - (Version: 4.0+)
+   install
+   tutorial 
+   reference
+   datadictionary
+   galery
+   
+   
 
-3. **Libraries:**
- + pymongo 
- + NLTK  
- + numpy  
- + networkx 2.3 
- + matplotlib 3.2.1 
- + gensim
- + sklearn    
- + python-louvain
- + scipy  
- + seaborn
- + pandas
- + wordcloud
- + Pyphen
- + requests-oauthlib
+*****************************************
+Twitter Analysis
+*****************************************
 
- 
-##### **Pre-requisites installation** 
-```
- pip install pymongo
- pip install nltk
- pip install numpy
- pip install networkx==2.3
- pip install matplotlib==3.2.1
- pip install gensim
- pip install -U scikit-learn 
- pip install python-louvain 
- pip install scipy 
- pip install seaborn 
- pip install pandas 
- pip install wordcloud
- pip install Pyphen
- pip install requests-oauthlib
-```
- 
- 
- #### **Things you can do with this library:**
+This package allows the user to load Twitter documents into a MongoDB database, process and analyze the data.
+
+**Things you can do with this library:**
+---------------------------------
+
  + Use mongoDB to store and process your Twitter data
  + Export edges created based on user connections 
  + create graphs, timeseries analysis, topic analysis, and graph analysis of you Twitter data
  + create folder structure to save all files (by period or not)
  + create the following files for each folder and sub folder
+
      + nodes with degrees 
      + edges
      + texts for topics
@@ -87,8 +48,8 @@ x = ta.TwitterAnalysis(BASE_PATH, db)
      + wordclouds (high degree nodes, high frequency hashtags, high frequency words)
      
      
-
-#### **Data Management with mongoDB**:
+**Data Management with mongoDB**:
+---------------------------------
  + load json twitter files into mongoDB
  
      *The logic is setup so that you can run the same file multiple times. It won't load the same file twice. And if something fails, it starts from where it stopped.
@@ -102,7 +63,8 @@ x = ta.TwitterAnalysis(BASE_PATH, db)
  + run different topic model analysis for hashtags groups  
   
  
-#### **Graph Analysis** 
+**Graph Analysis** 
+---------------------------------
 
  + load a networkx file from node/edge files
  + print measurements from graph (Diameter, Radius, Extrema bounding, Centers with their degree, # Nodes, # Edges)
@@ -111,10 +73,23 @@ x = ta.TwitterAnalysis(BASE_PATH, db)
  + contract nodes
  
   
-#### **Topic Analysis** 
+**Topic Analysis** 
+---------------------------------
 
  + train topic model
  + plot topic distribution
  + plot frequency lists (hashtags, word frequency)
  
  
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+
+
+
+
+

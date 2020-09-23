@@ -6,12 +6,16 @@ with open("README.md", "r") as fh:
     
 setuptools.setup(
     name="pytwanalysis",
-    version="0.0.1",
+    version="0.0.6",
     author="Lia Nogueira",    
-    description="A tool to gather, discover, and analyze Twitter data using a combinations of graph-clustering and topic modeling techniques with the goal of semantically grouping tweet messages together.",
+    description="A tool to gather, discover, and analyze Twitter data using a combination of graph-clustering and topic modeling techniques with the goal of semantically grouping tweet messages together.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/lianogueira/pytwanalysis",
+    project_urls={
+        "Source Code": "https://github.com/lianogueira/pytwanalysis",
+        "Documentation": "https://lianogueira.github.io/pytwanalysis-documentation/",
+    },
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3.7",

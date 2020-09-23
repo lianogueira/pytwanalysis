@@ -26,16 +26,16 @@ MIN_NO_OF_NODES_TO_REDUCE_GRAPH = 100
 
 
 class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
-
+    """
+    Main class - It inherits TwitterGraphs, TwitterDB, and TwitterTopics classes.    
+    """
     def __init__(
             self, 
             base_folder_path, 
-            mongoDB_database,  
-            strFocusedTweetFields="id_str;created_at;lang;retweet_count;in_reply_to_status_id_str;in_reply_to_screen_name", 
-            strFocusedTweetUserFields="name;screen_name;description;location;followers_count;friends_count;statuses_count;lang;verified"):
+            mongoDB_database):
         
-        TwitterGraphs.__init__(self,base_folder_path)
-        TwitterDB.__init__(self, mongoDB_database, strFocusedTweetFields, strFocusedTweetUserFields)
+        TwitterGraphs.__init__(self, base_folder_path)
+        TwitterDB.__init__(self, mongoDB_database)
         TwitterTopics.__init__(self, base_folder_path, mongoDB_database)
 
         self.type_of_graph = 'user_conn_all'
@@ -104,6 +104,155 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
             period_top_degree_start=1, 
             period_top_degree_end=5, 
             commty_edge_size_cutoff=200):
+            
+        """
+        Configure the current object settings to drive the automation of the analysis files
+                
+        Parameters
+        ----------               
+        type_of_graph : (Optional)
+            This setting defines the type of graph to analyze. Six different options are available: user_conn_all, user_conn_retweet, user_conn_quote, user_conn_reply, user_conn_mention, and ht_conn.
+            (Default='user_conn_all')
+        
+        is_bot_Filter : (Default=None)
+        
+        period_arr : (Optional)
+            An array of start and end dates can be set so that the pipeline creates a separate analysis folder for each of the periods in the array. (Default=None)
+        
+        create_nodes_edges_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will create two files for each graph and sub-graph. One file with the edge list, and one with the node list and their respective degree.(Default='Y') 
+        
+        create_graphs_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will plot the graph showing all the connections.
+            (Default='Y')
+        
+        create_topic_model_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will create topic discovery related files for each folder. It will create a text file with all the tweets that are part of that folder, it will also train a LDA model based on the tweets texts and plot a graph with the results.
+            (Default='Y')
+        
+        create_ht_frequency_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will create hashtag frequency files for each folder. It will create a text file with the full list of hashtags and their frequency, a wordcloud showing the most frequently used hashtags, and barcharts showing the top 30 hashtags.
+            (Default='y')'
+        
+        create_words_frequency_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will create word frequency files for each folder. It will create a text file with a list of words and their frequency, a wordcloud showing the most frequently used words, and barcharts showing the top 30 words.
+            (Default='Y') 
+        
+        create_timeseries_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will create timeseries graphs for each folder representing the tweet count by day, and the top hashtags frequency count by day.
+            (Default='Y')    
+        
+        create_top_nodes_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will create separate analysis folders for all the top degree nodes.
+            (Default='Y') 
+        
+        create_community_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will use the louvain method to assign each node to a community. A separate folder for each of the communities will be created with all the analysis files.
+            (Default='N') 
+        
+        create_ht_conn_files_flag : (Optional)
+            If this setting is set to 'Y', the pipeline will plot hashtag connections graphs. This can be used when user connections are being analyzed, but it could still be interesting to see the hashtags connections made by that group of users.
+            (Default='Y') 
+        
+        num_of_topics : (Optional)
+            If the setting *CREATE_TOPIC_MODEL_FILES_FLAG* was set to 'Y', then this number will be used to send as input to the LDA model. If no number is given, the pipeline will use 4 as the default value.
+            (Default=4) 
+        
+        top_no_word_filter : (Optional)
+            If the setting *CREATE_WORDS_FREQUENCY_FILES_FLAG* was set to 'Y', then this number will be used to decide how many words will be saved in the word frequency list text file. If no number is given, the pipeline will use 5000 as the default value.
+            (Default=None)
+        
+        top_ht_to_ignore : (Optional)
+            If the setting *CREATE_HT_CONN_FILES_FLAG* was set to 'Y', then this number will be used to choose how many top hashtags can be ignored. Sometimes ignoring the main hashtag can be helpful in visualizations to discovery other interesting structures within the graph.
+            (Default=None)
+        
+        graph_plot_cutoff_no_nodes : (Optional)
+            Used with the graph_plot_cutoff_no_edges parameter. For each graph created, these numbers will be used as cutoff values to decide if a graph is too large to be plot or not. Choosing a large number can result in having the graph to take a long time to run. Choosing a small number can result in graphs that are too reduced and with little value or even graphs that can't be printed at all because they can't be reduce further. 
+            (Default=500) 
+        
+        graph_plot_cutoff_no_edges : (Optional) 
+            Used with the graph_plot_cutoff_no_nodes parameter. For each graph created, these numbers will be used as cutoff values to decide if a graph is too large to be plot or not. Choosing a large number can result in having the graph to take a long time to run. Choosing a small number can result in graphs that are too reduced and with little value or even graphs that can't be printed at all because they can't be reduce further. 
+            (Default=2000)
+        
+        create_graph_without_node_scale_flag : (Optional)
+            For each graph created, if this setting is set to 'Y', the pipeline will try to plot the full graph with no reduction and without any logic for scaling the node size.
+            (Default='N') 
+        
+        create_graph_with_node_scale_flag : (Optional)
+            For each graph created, if this setting is set to 'Y', the pipeline will try to plot the full graph with no reduction, but with additional logic for scaling the node size.
+            (Default='Y') 
+        
+        create_reduced_graph_flag : (Optional)
+            For each graph created, if this setting is set to 'Y', the pipeline will try to plot the reduced form of the graph.
+            (Default='Y') 
+        
+        reduced_graph_comty_contract_per : (Optional)
+            If the setting *CREATE_REDUCED_GRAPH_FLAG* was set to 'Y', then this number will be used to reduce the graphs by removing a percentage of each community found in that particular graph. The logic can be run multiple times with different percentages. For each time, a new graph file will be saved with a different name according to the parameter given.
+            (Default=90) 
+        
+        reduced_graph_remove_edge_weight : (Optional)
+            If the setting *CREATE_REDUCED_GRAPH_FLAG* was set to 'Y', then this number will be used to reduce the graphs by removing edges that have weights smaller then this number. The logic can be run multiple times with different percentages. For each time, a new graph file will be saved with a different name according to the parameter given.
+            (Default=None)
+        
+        reduced_graph_remove_edges : (Optional)
+            If this setting is set to 'Y', and the setting *CREATE_REDUCED_GRAPH_FLAG was set to 'Y', then the pipeline will continuously try to reduce the graphs by removing edges of nodes with degrees smaller than this number. It will stop the graph reduction once it hits the the values set int the GRAPH_PLOT_CUTOFF parameters.
+            (Default='Y')     
+        
+        top_degree_start : (Optional)
+            If the setting  *CREATE_TOP_NODES_FILES_FLAG* was set to 'Y', then these numbers will define how many top degree node sub-folders to create.
+            (Default=1) 
+        
+        top_degree_end : (Optional)
+            If the setting  *CREATE_TOP_NODES_FILES_FLAG* was set to 'Y', then these numbers will define how many top degree node sub-folders to create.
+            (Default=10) 
+        
+        period_top_degree_start : (Optional)
+            If the setting  *CREATE_TOP_NODES_FILES_FLAG* was set to 'Y', then these numbers will define how many top degree node sub-folders for each period to create.
+            (Default=1) 
+        
+        period_top_degree_end : (Optional)
+            If the setting  *CREATE_TOP_NODES_FILES_FLAG* was set to 'Y', then these numbers will define how many top degree node sub-folders for each period to create.
+            (Default=5) 
+        
+        commty_edge_size_cutoff : (Optional)
+            If the setting textit{CREATE_COMMUNITY_FILES_FLAG} was set to 'Y', then this number will be used as the community size cutoff number. Any communities that have less nodes then this number will be ignored. If no number is given, the pipeline will use 200 as the default value.
+            (Default=200)                 
+        
+        Examples
+        --------          
+        ...:
+        
+            >>> setConfigs(type_of_graph=TYPE_OF_GRAPH,
+            >>>             is_bot_Filter=IS_BOT_FILTER,
+            >>>             period_arr=PERIOD_ARR,
+            >>>             create_nodes_edges_files_flag=CREATE_NODES_EDGES_FILES_FLAG, 
+            >>>             create_graphs_files_flag=CREATE_GRAPHS_FILES_FLAG,
+            >>>             create_topic_model_files_flag=CREATE_TOPIC_MODEL_FILES_FLAG,
+            >>>             create_ht_frequency_files_flag=CREATE_HT_FREQUENCY_FILES_FLAG,
+            >>>             create_words_frequency_files_flag=CREATE_WORDS_FREQUENCY_FILES_FLAG,
+            >>>             create_timeseries_files_flag=CREATE_TIMESERIES_FILES_FLAG,
+            >>>             create_top_nodes_files_flag=CREATE_TOP_NODES_FILES_FLAG, 
+            >>>             create_community_files_flag=CREATE_COMMUNITY_FILES_FLAG,
+            >>>             create_ht_conn_files_flag=CREATE_HT_CONN_FILES_FLAG,
+            >>>             num_of_topics=NUM_OF_TOPICS, 
+            >>>             top_no_word_filter=TOP_NO_WORD_FILTER, 
+            >>>             top_ht_to_ignore=TOP_HT_TO_IGNORE,
+            >>>             graph_plot_cutoff_no_nodes=GRAPH_PLOT_CUTOFF_NO_NODES, 
+            >>>             graph_plot_cutoff_no_edges=GRAPH_PLOT_CUTOFF_NO_EDGES,
+            >>>             create_graph_without_node_scale_flag=CREATE_GRAPH_WITHOUT_NODE_SCALE_FLAG, 
+            >>>             create_graph_with_node_scale_flag=CREATE_GRAPH_WITH_NODE_SCALE_FLAG, 
+            >>>             create_reduced_graph_flag=CREATE_REDUCED_GRAPH_FLAG,
+            >>>             reduced_graph_comty_contract_per=REDUCED_GRAPH_COMTY_PER,
+            >>>             reduced_graph_remove_edge_weight=REDUCED_GRAPH_REMOVE_EDGE_WEIGHT, 
+            >>>             reduced_graph_remove_edges=REDUCED_GRAPH_REMOVE_EDGES_UNTIL_CUTOFF_FLAG,                            
+            >>>             top_degree_start=TOP_DEGREE_START, 
+            >>>             top_degree_end=TOP_DEGREE_END, 
+            >>>             period_top_degree_start=PERIOD_TOP_DEGREE_START, 
+            >>>             period_top_degree_end=PERIOD_TOP_DEGREE_END, 
+            >>>             commty_edge_size_cutoff=COMMTY_EDGE_SIZE_CUTOFF
+            >>>             )            
+            
+        """
                 
         self.type_of_graph = type_of_graph
         self.is_bot_Filter = is_bot_Filter
@@ -170,6 +319,26 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Method: concat_edges
     # Description: aux function to concatenate edges to help filter in mongoDB
     def concat_edges(self, G):
+        """
+        Aux function to concatenate edges to help filter in mongoDB
+                
+        Parameters
+        ----------               
+        G : 
+            undirected networkx graph created from the Twitter data                               
+        
+        Returns
+        -------
+        arr_edges
+            the array with the concatenatd edges            
+    
+        Examples
+        --------          
+        Create an array of concatenated edges from a networkx graph:
+        
+            >>> arr_edges = concat_edges(G)
+        """
+        
         arr_edges = []                        
         for u,v,a in G.edges(data=True):
             arr_edges.append(u.lower() + '-' +v.lower())
@@ -181,6 +350,30 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Method: build_db_collections
     # Description: Call methods to create all collections in mongoDB
     def build_db_collections(self, inc=100000, bots_ids_list_file=None):
+        """
+        This method is in charge of extracting, cleaning, and loading the data 
+        into all the collections in MongoDB. 
+       
+        Parameters
+        ----------               
+        inc : (Optional)
+            used to determine how many tweets will be processed at a time - (Default=100000).
+            A large number may cause out of memory errors, and a low number may take a long time to run, 
+            so the decision of what number to use should be made based on the hardware specification.
+              
+        bots_ids_list_file : (Optional)
+            a file that contains a list of user ids that are bots. 
+            It creates flags in the MongoDB collection to indentify 
+            which tweets and user are in the bots list. - (Default=None)
+                 
+    
+        Examples
+        --------          
+        Load all data into all collections in MongoDB:
+            
+            >>> inc = 50000
+            >>> build_db_collections(inc)
+        """
                 
         ### Loading Focused Data into MongoDB
         self.loadFocusedData(inc)
@@ -237,6 +430,21 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Description: aux function to plot graph. 
     # This steps repets in different parts of this code, so creating a function to avoid repetition
     def plot_graph_contracted_nodes(self, G, file):
+        """
+        Method to compress and plot graph based on the graph reduction 
+        settings that can be updated using the *setConfigs* method.                
+                
+        Parameters
+        ----------               
+        G : 
+            undirected networkx graph created from the Twitter data
+        file :
+            the path and name of the graph you want to save
+                
+        Example
+        --------                          
+            >>> plot_graph_contracted_nodes(G, 'c:\\Data\\MyGraph.png')
+        """
 
         G2 = G.copy()   
         
@@ -324,7 +532,7 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
                                                v_iterations, 
                                                cluster_fl='Y', 
                                                v_labels=list(list(labels2)), 
-                                               replace_existing_file=False)                
+                                               replace_existing_file=False) 
 
 
 
@@ -333,6 +541,53 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Description: export edges that will be used to create graphs
     # User can choose only one type of graph to export the edges, or export them all
     def export_mult_types_edges_for_input(self, period_arr=None, bot_filter_fl='N', type_of_graph='all'):
+        """
+        This method will export edges from mongoDB data that can be used to create graphs.
+        The user can choose only one type of graph to export the edges, or export them all
+                
+        Parameters
+        ----------
+        period_arr : (Optional)
+            An array with showing the different periods to be analyzed separatly in the data.
+            (Default = None)
+            
+        bot_filter_fl : (Optional)
+            A flag to identify if you want to create extra edge files separating tweets by bots or not.
+            This option is only available when the bot flag was updated in mongoDB using method set_bot_flag_based_on_arr.
+            (Default='N')
+            
+        type_of_graph : (Optional)
+            the type of graph to export the edges for. 
+            Available options: user_conn_all, user_conn_mention, 
+            user_conn_retweet, user_conn_reply, user_conn_quote, ht_conn, or all
+            (Default='all')
+                
+        Example
+        --------                          
+            >>> # Set up the periods you want to analyse 
+            >>> # Set period_arr to None if you don't want to analyze separate periods
+            >>> # Format: Period Name, Period Start Date, Period End Date
+            >>> period_arr = [['P1', '10/08/2017 00:00:00', '10/15/2017 00:00:00'],             
+            >>>               ['P2', '01/21/2018 00:00:00', '02/04/2018 00:00:00'],              
+            >>>               ['P3', '02/04/2018 00:00:00', '02/18/2018 00:00:00'],
+            >>>               ['P4', '02/18/2018 00:00:00', '03/04/2018 00:00:00']]
+            >>> 
+            >>> 
+            >>> ## TYPE OF GRAPH EDGES
+            >>> ########################################################
+            >>> # You can export edges for one type, or for all
+            >>> # Options: user_conn_all,       --All user connections
+            >>> #          user_conn_mention,   --Only Mentions user connections
+            >>> #          user_conn_retweet,   --Only Retweets user connections
+            >>> #          user_conn_reply,     --Only Replies user connections
+            >>> #          user_conn_quote,     --Only Quotes user connections
+            >>> #          ht_conn              --Hashtag connects - (Hashtgs that wereused together)
+            >>> #          all                  --It will export all of the above options
+            >>> 
+            >>> TYPE_OF_GRAPH = 'all'
+            >>> 
+            >>> export_mult_types_edges_for_input(period_arr=period_arr, type_of_graph=TYPE_OF_GRAPH)
+        """
         
         if type_of_graph == 'all' or type_of_graph == 'user_conn_all':
             self.export_all_edges_for_input(period_arr, bot_filter_fl, type_of_graph='user_conn_all')
@@ -456,7 +711,24 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     #####################################
     # Method: nodes_edges_analysis_files
     # Description: creates nodes and edges files       
-    def nodes_edges_analysis_files(self, G, path):                        
+    def nodes_edges_analysis_files(self, G, path): 
+        """
+        Given a graph G, it exports nodes with they degree, edges with their weight, 
+        and word clouds representing the nodes scaled  by their degree
+                
+        Parameters
+        ----------               
+        G : 
+            undirected networkx graph created from the Twitter data                               
+        path :
+            the path where the files should be saved
+    
+        Examples
+        --------          
+            Saved node and edges files into path:
+        
+            >>> nodes_edges_analysis_files(G, 'C:\\Data\\MyFilePath')
+        """            
         
         print("****** Exporting nodes and edges to file - " + self.get_now_dt())
         self.export_nodes_edges_to_file(G, path + "\\G_NodesWithDegree.txt", path + "\\G_Edges.txt")
@@ -472,7 +744,39 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Description: creates topic model files
     # tweet texts, lda model visualization
     def lda_analysis_files(self, path, startDate_filter=None, endDate_filter=None, arr_edges=None, arr_ht_edges=None):            
+        """
+        Creates topic model files. Export a files with tweet texts and a lda model visualization.
+        The data comes from the mongoDB database and is filtered based on the parameters.
+                
+        Parameters
+        ----------                                       
+        path :
+            the path where the files should be saved
+        
+        startDate_filter : (Optional)
+            filter by a certain start date
             
+        endDate_filter : (Optional)
+            filter by a certain end date
+        
+        arr_edges : (Optional)
+            and array of concatenated edges that will be used to filter certain connection only.
+            the method concat_edges can be used to create that array.
+        
+        arr_ht_edges : (Optional)
+            and array of concatenated hashtag edges that will be used to filter certain ht connection only.
+            the method concat_edges can be used to create that array. 
+    
+        Examples
+        --------          
+            Save lda analysis files into path:
+        
+            >>> lda_analysis_files(
+            >>>     'D:\\Data\\MyFiles', 
+            >>>     startDate_filter='09/20/2020 19:00:00', 
+            >>>     endDate_filter='03/04/2021 00:00:00')
+        """ 
+        
         #export text for topic analysis
         print("****** Exporting text for topic analysis - " + self.get_now_dt())    
         self.exportData('text_for_topics', 
@@ -489,15 +793,48 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
         model_name = "Topics"
         topics_file_name = path + '\\T_tweetTextsForTopics.txt'
         if not os.path.exists(path + '\\Topics-(LDA model).png'):
-            self.train_model_from_file(topics_file_name, self.num_of_topics, model_name)
+            self.train_model_from_file(topics_file_name, self.num_of_topics, model_name, model_type='lda')
             self.plot_topics(path + '\\Topics-(LDA model).png', self.num_of_topics, 'lda', replace_existing_file=False)
         
+
 
     #####################################
     # Method: ht_analysis_files
     # Description: creates hashtag frequency files
     # frequency file text, wordcloud, and barcharts
     def ht_analysis_files(self, path, startDate_filter=None, endDate_filter=None, arr_edges=None, arr_ht_edges=None):        
+        """
+        Creates hashtag frequency files. Frequency text file, wordcloud, and barcharts.
+        The data comes from the mongoDB database and is filtered based on the parameters.
+                
+        Parameters
+        ----------                                       
+        path :
+            the path where the files should be saved
+        
+        startDate_filter : (Optional)
+            filter by a certain start date
+            
+        endDate_filter : (Optional)
+            filter by a certain end date
+        
+        arr_edges : (Optional)
+            and array of concatenated edges that will be used to filter certain connection only.
+            the method concat_edges can be used to create that array.
+        
+        arr_ht_edges : (Optional)
+            and array of concatenated hashtag edges that will be used to filter certain ht connection only.
+            the method concat_edges can be used to create that array.
+    
+        Examples
+        --------          
+            Save hashtag frequency files into path:
+        
+            >>> ht_analysis_files(
+            >>>     'D:\\Data\\MyFiles', 
+            >>>     startDate_filter='09/20/2020 19:00:00', 
+            >>>     endDate_filter='03/04/2021 00:00:00')
+        """
         
         #export ht frequency list         
         print("\n****** Exporting ht frequency list - " + self.get_now_dt())
@@ -526,7 +863,39 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Description: creates words frequency files
     # frequency file text, wordcloud, and barcharts
     def words_analysis_files(self, path, startDate_filter=None, endDate_filter=None, arr_edges=None, arr_ht_edges=None):        
+        """
+        Creates words frequency files. Frequency text file, wordcloud, and barcharts.
+        The data comes from the mongoDB database and is filtered based on the parameters.
                 
+        Parameters
+        ----------                                       
+        path :
+            the path where the files should be saved
+        
+        startDate_filter : (Optional)
+            filter by a certain start date
+            
+        endDate_filter : (Optional)
+            filter by a certain end date
+        
+        arr_edges : (Optional)
+            and array of concatenated edges that will be used to filter certain connection only.
+            the method concat_edges can be used to create that array.
+        
+        arr_ht_edges : (Optional)
+            and array of concatenated hashtag edges that will be used to filter certain ht connection only.
+            the method concat_edges can be used to create that array.
+    
+        Examples
+        --------          
+            Save words frequency files into path:
+        
+            >>> words_analysis_files(
+            >>>     'D:\\Data\\MyFiles', 
+            >>>     startDate_filter='09/20/2020 19:00:00', 
+            >>>     endDate_filter='03/04/2021 00:00:00')
+            
+        """                
         #export words frequency list 
         print("\n****** Exporting words frequency list - " + self.get_now_dt())        
         self.exportData('word_frequency_list', 
@@ -552,6 +921,39 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Method: time_series_files
     # Description: creates time frequency files    
     def time_series_files(self, path, startDate_filter=None, endDate_filter=None, arr_edges=None, arr_ht_edges=None):        
+        """
+        Creates timeseries frequency files. Tweet count by day and hashcount count by day.
+        The data comes from the mongoDB database and is filtered based on the parameters.
+                
+        Parameters
+        ----------                                       
+        path :
+            the path where the files should be saved
+        
+        startDate_filter : (Optional)
+            filter by a certain start date
+            
+        endDate_filter : (Optional)
+            filter by a certain end date
+        
+        arr_edges : (Optional)
+            and array of concatenated edges that will be used to filter certain connection only.
+            the method concat_edges can be used to create that array.
+        
+        arr_ht_edges : (Optional)
+            and array of concatenated hashtag edges that will be used to filter certain ht connection only.
+            the method concat_edges can be used to create that array.
+    
+        Examples
+        --------          
+            Save timeseries frequency files into path:
+        
+            >>> time_series_files(
+            >>>    'D:\\Data\\MyFiles', 
+            >>>    startDate_filter='09/20/2020 19:00:00', 
+            >>>    endDate_filter='03/04/2021 00:00:00')
+        """  
+        
                           
         print("****** Exporting time series files - " + self.get_now_dt())           
         tweet_df = self.get_time_series_df(startDate_filter=startDate_filter, endDate_filter=endDate_filter, arr_edges=arr_edges, arr_ht_edges=arr_ht_edges)
@@ -620,7 +1022,27 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Method: graph_analysis_files
     # Description: creates graphs files
     def graph_analysis_files(self, G, path, gr_prefix_nm=''):
-    
+        """
+        Plot graph analysis files for a given graph G. 
+        It uses the configuration set on the setConfigs method.
+                
+        Parameters
+        ----------               
+        G : 
+            undirected networkx graph created from the Twitter data                               
+        path :
+            the path where the files should be saved
+        
+        gr_prefix_nm: (Optional)
+            a prefix to add to the graph name. (Default='')
+            
+        Examples
+        --------          
+        Create graph visualization files
+        
+            >>> graph_analysis_files(G, 'C:\\Data\\MyAnalysis\\', 'MyNameTest')
+        """      
+        
         if len(G.nodes()) > 0 and len(G.edges()) > 0:
         
             #plot graph
@@ -675,7 +1097,23 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Method: edge_files_analysis
     # Description: load graph from edge files and call methods to create all analysis 
     # files for the main graph and for the graph of each period
-    def edge_files_analysis(self, output_path):    
+    def edge_files_analysis(self, output_path): 
+        """
+        Automated way to generate all analysis files. 
+        It creates all folders, edge files, and any other files based on given settings. 
+        The setting of what files are interesting or not, should be set using the setConfigs method.
+        
+        Parameters
+        ----------                                       
+        output_path :
+            the path where the files should be saved        
+    
+        Examples
+        --------          
+            Create all analysis files and folder based on the configurations set on setConfigs:
+        
+            >>> edge_files_analysis('D:\\Data\\MyFiles') 
+        """      
                 
         case_ht_str = ''
         if self.type_of_graph == 'ht_conn':
@@ -956,6 +1394,34 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
             endDate_filter=None, 
             arr_edges=None, 
             arr_ht_edges=None):
+        """  
+        Method to query data in mongoDB for timeseries analysis given certain filters.
+        It creates all folders, edge files, and any other files based on given settings. 
+        The setting of what files are interesting or not, should be set using the setConfigs method.
+        
+        Parameters
+        ----------                                       
+        ht_arr :
+            array of hashtags to filter the data from
+        
+        startDate_filter : (Optional)
+            filter by a certain start date
+            
+        endDate_filter : (Optional)
+            filter by a certain end date
+        
+        arr_edges : (Optional)
+            and array of concatenated edges that will be used to filter certain connection only.
+            the method concat_edges can be used to create that array.
+        
+        arr_ht_edges : (Optional)
+            and array of concatenated hashtag edges that will be used to filter certain ht connection only.
+            the method concat_edges can be used to create that array.
+    
+        Examples
+        --------        
+            >>> ...
+        """   
         
         df = pd.DataFrame()
 
@@ -1062,12 +1528,65 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
         plt.clf()   # Clear figure
         plt.close() # Close a figure window
     
+    
        
     #####################################
     # Method: eda_analysis
     # Description: Save EDA files
     def eda_analysis(self):
-               
+        """  
+        Method to print a summary of the initial exploratory data analysis for any dataset.        
+
+        Examples
+        --------          
+            >>> # Create Exploratory Data Analysis files
+            >>> eda_analysis()
+            
+        It includes the following metrics:
+        
+        + **Tweet counts**: The number of tweet document in the database, divided by the following categories.
+            
+                + Total Original Tweets: The number of tweet documents in the database that are original tweets.		
+                + Total Replies: The number of tweet documents in the database that are replies to another tweet.		
+                + Total Retweets: The number of tweet documents in the database that are retweets.		
+                + Total Tweets: The total number of tweet documents in the database.
+            
+        + **Tweet counts by language**: The number of tweets document for each language used in the tweets.
+
+        + **Tweet counts by month**: The number of tweets document for each month/year.
+
+        + **Tweet counts by file**: The number of tweets document imported from each of the json files.
+
+        + **User counts**: The number of users in the database, divided by the following categories.
+            
+                + tweet: Users with at least one document in the database.
+                + retweet: Users that were retweeted, but are not part of previous group.
+                + quote: Users that were quoted, but are not part of previous groups.
+                + reply: Users that were replied to, but are not part of previous groups.
+                + mention: Users that were mentioned, but are not part of previous groups.
+                        
+        + **All User Connections Graph**: The metrics for the graph created based on the users connecting by retweets, quotes, mentions, and replies.
+            
+                + # of Nodes: The total number of nodes in the graph.
+                + # of Edges: The total number of edges in the graph.
+                + # of Nodes of the largest connected components: The total number of nodes in the largest connected component of the graph.
+                + # of Edges of the largest connected components: The total number of edges in the largest connected component of the graph.                
+                + # of Disconnected Graphs: The number of sub-graphs within the main graph that are not connected to each other.                
+                + # of Louvain Communities found in the largest connected component: The number of communities found in the largest connected component using the Louvain method.                
+                + Degree of the top 5 most connected users: List of the top 5 users with the highest degree. Shows the user screen name and respective degrees.                
+                + Average Node Degree of largest connected graph: The average degree of all nodes that are part of the largest connected component of the graph.                
+                + Plot of the Louvain community distribution: A barchart showing the node count distribution of the communities found with the Louvain method.
+                + Disconnected graphs distribution: A plot of a graph showing the distribution of the disconnected graphs. It shows the total number of nodes and edges for each of the disconnected graphs. 
+                
+        + **Mentions User Connections Graph**: The same metrics as the *All User Connections* graph, but only considering the connections made by mentions.
+
+        + **Retweets User Connections Graph**: The same metrics as the *All User Connections* graph, but only considering the connections made by retweets.
+
+        + **Replies User Connections Graph**: The same metrics as the *All User Connections* graph, but only considering the connections made by replies.
+
+        + **HT Connection Graph**: The same metrics as the *All User Connections* graph, but only considering the connections made by hashtags.           
+
+        """                 
         eda_folder =  self.folder_path  + '\\EDA'
         self.create_path(eda_folder)                    
         eda_file = open(eda_folder + '\\EDA.txt', 'w', encoding="utf-8")
@@ -1184,7 +1703,7 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
                                               file_name=eda_folder+'\\' + arr_type_pre[i][0] + 'community_louvain_dist.png')        
 
                     # Degree arrays
-                    #arr = np.array(sorted(G2.degree(), key=lambda x: x[1], reverse=True))                
+                    arr = np.array(sorted(G2.degree(), key=lambda x: x[1], reverse=True))                
                     #deg_mean = np.asarray(arr[:,1], dtype=np.integer).mean()
                     # get the mean node degree of the nodes
                     deg_mean = self.calculate_average_node_degree(G2)
@@ -1249,6 +1768,34 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
     # Method: print_top_nodes_cluster_metrics
     # Description: calculate clustering metrics for top degree nodes
     def print_top_nodes_cluster_metrics(self, G, top_degree_end, acc_node_size_cutoff=None):                                      
+        """
+        Calculates clustering metrics for top degree nodes        
+                
+        Parameters
+        ----------               
+        G : 
+            undirected networkx graph created from the Twitter data                               
+        
+        top_degree_end :
+            the number of top nodes to use for calculation
+        
+        acc_node_size_cutoff : (Optional)
+            The average clustering coefficient metric can take a long time to run, 
+            so users can set a cutoff number in this parameter for the graph size 
+            that will decide if that metric will be printed or not depending on the graph size. (Default=None)
+              
+            
+        Examples
+        --------          
+        Create graph visualization files
+        
+            >>> print_cluster_metrics(
+            >>> G_Community, 
+            >>> G, 
+            >>> top_no=3, 
+            >>> acc_node_size_cutoff=None
+            >>> )
+        """  
         
         exec_tm = 0
         endtime = 0
@@ -1283,12 +1830,36 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
         #exec_tm_total = endtime - starttime        
         print("Execution Time:  %s seconds " % (endtime - starttime - exec_tm))
             
-            
+
     #####################################
     # Method: print_commty_cluster_metrics
     # Description: calls methods to create files for each of the communities found 
     def print_commty_cluster_metrics(self, G, comm_att='community_louvain', ignore_cmmty_lt=0, acc_node_size_cutoff=None):
+        """
+        Calculates clustering metrics for top degree nodes        
                 
+        Parameters
+        ----------               
+        G : 
+            undirected networkx graph created from the Twitter data                               
+        
+        comm_att : (Optional)
+            Possible values: 'community_louvain' or 'spectral_clustering'. (Default='community_louvain')
+        
+        ignore_cmmty_lt : (Optional)
+             Number used to ignore small communitites. 
+             The logic will not calculate metrics for communities smaller than this number. (Default=0)
+
+        acc_node_size_cutoff : (Optional)
+            The average clustering coefficient metric can take a long time to run, 
+            so users can set a cutoff number in this parameter for the graph size 
+            that will decide if that metric will be printed or not depending on the graph size. (Default=None)
+                         
+        Examples
+        --------                              
+            >>> print_commty_cluster_metrics(G, 'community_louvain', '10')
+        """  
+        
         if len(G.edges()) != 0:
 
             # find the number of communities in the graph
@@ -1315,3 +1886,5 @@ class TwitterAnalysis(TwitterGraphs, TwitterDB, TwitterTopics):
              
             
             print("Total # of Communities with more than " + str(ignore_cmmty_lt) + ' nodes: ' + str(no_of_comm_gt_cutoff))
+            
+            

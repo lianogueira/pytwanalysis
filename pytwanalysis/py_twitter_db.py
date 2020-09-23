@@ -18,6 +18,8 @@ import string
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 import itertools 
+import requests
+from requests_oauthlib import OAuth1
 
 dictionary_words = dict.fromkeys(words.words(), None)
 
@@ -37,12 +39,12 @@ lemma = WordNetLemmatizer()
 topic_doc_complete = []
 
 
-
 class TwitterDB:
+    """
+    TwitterDB class
+    """
 
-    def __init__(self, mongoDB_database, 
-                 strFocusedTweetFields="id_str;created_at;lang;retweet_count;in_reply_to_status_id_str;in_reply_to_screen_name", 
-                 strFocusedTweetUserFields="name;screen_name;description;location;followers_count;friends_count;statuses_count;lang;verified"):
+    def __init__(self, mongoDB_database):
         #Inititalizing MongoDB collections        
         self.db = mongoDB_database                
         self.db.dc_bSettings = self.db.adm_dbSettings
@@ -66,25 +68,20 @@ class TwitterDB:
         self.c_tweetConnections = self.db.tweetConnections
         self.c_users = self.db.users
         self.c_tweetHTConnections = self.db.tweetHTConnections
+        self.c_tweetHTConnections = self.db.tweetHTConnections
+        self.c_searches = self.db.searches
         #temp collections to help with query performance
         self.c_tmpEdges = self.db.tmpEdges
         self.c_tmpEdgesTweetIds = self.db.tmpEdgesTweetIds
         self.c_tmpEdgesHTFreq = self.db.tmpEdgesHTFreq
         self.c_tmpEdgesWordFreq = self.db.tmpEdgesWordFreq
-        
-        
-        #load these settings from DB. If no settings yet, use default        
-        self.strFocusedTweetFields = strFocusedTweetFields
-        self.periodGrain = "month"         
-        self.add_lowerCase_fields_FL = 'Y'
-        self.label_EnWords_FL = 'N'
-        self.pos_tag_label_FL = 'Y'
-        self.lemm_word_FL = 'Y'
-        self.ignore_stop_words_FL = 'Y'        
-                
+                        
         # Put fields chosen into an array of fields. 
-        # These fields will be the ones used in the FocusedTweet collection.             
-        self.strFocusedTweetFieldsArr = strFocusedTweetFields.split(";")        
+        # These fields will be the ones used in the FocusedTweet collection             
+        strFocusedTweetFields="lang;retweet_count;in_reply_to_status_id_str;in_reply_to_screen_name"
+        strFocusedTweetUserFields="name;screen_name;description;location;followers_count;friends_count;statuses_count;lang;verified"        
+        self.strFocusedTweetFields = strFocusedTweetFields        
+        self.strFocusedTweetFieldsArr = strFocusedTweetFields.split(";")
         self.strFocusedTweetUserFieldsArr = strFocusedTweetUserFields.split(";")
             
         # Create unique index on users table to only allow one users with same user_id and screen_name. 
@@ -95,9 +92,44 @@ class TwitterDB:
                                              unique = True, 
                                              collation=Collation(locale="en_US", strength=2))
         except Exception as e:
-            print('Could not create index in users' + str(e))
+            print('Warning: Could not create a new index in users' + str(e))
+            
+        
+        # Create unique index on tweet table to make sure we don't store duplicate tweets        
+        try:
+            resp = self.c_tweet.create_index([('id', pymongo.ASCENDING)], 
+                                             unique = True)
+        except:
+            pass
                   
 
+
+    def setFocusedDataConfigs(self, strFocusedTweetFields, strFocusedTweetUserFields):        
+        """
+        Twitter documents have an extensive number of fields. In order to focus only on the interesting pieces of information, this method allows you to choose which fields to keep. 
+                
+        Parameters
+        ----------               
+        strFocusedTweetFields : fields that you find interesting in the Tweet object
+        
+        strFocusedTweetUserFields : fields that you find interesting in the User object
+                
+        
+        Examples
+        --------          
+        Setting configurations to decide which fields to keep:
+        
+            >>> focusedTweetFields = 'lang;retweet_count;in_reply_to_screen_name'
+            >>> focusedTweetUserFields = 'name;description;location;friends_count;verified'
+            >>> setFocusedDataConfigs(focusedTweetFields, focusedTweetUserFields)
+            
+        """
+        # Put fields chosen into an array of fields. 
+        # These fields will be the ones used in the FocusedTweet collection
+        self.strFocusedTweetFieldsArr = strFocusedTweetFields.split(";")        
+        self.strFocusedTweetUserFieldsArr = strFocusedTweetUserFields.split(";")
+        
+                
     #####################################
     # Method: loadDocFromFile
     # Description: This method will load tweet .json files into the DB (tweet collection)
@@ -107,6 +139,23 @@ class TwitterDB:
     # Parameters: 
     #   -directory = the directory where the files are stored
     def loadDocFromFile(self, directory):
+        """
+        This method will load tweet .json files into the DB (tweet collection)
+        It goes through all .json files in the directory and load them one by one. 
+        It also saves the files already loaded into the 'loadedFiles' collection 
+        to make sure we don't load the same file twice
+        
+        Parameters
+        ----------                                       
+        directory :
+            the directory where the files are stored 
+    
+        Examples
+        --------          
+            Import data from json files into a mongoDB database:
+        
+            >>> loadDocFromFile(json_file_path = 'C:\\Data\\My_JSON_Files_folder')
+        """    
         seq_no = 1
 
         starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -246,7 +295,7 @@ class TwitterDB:
                 elif collection_name == 'tweetConnections':
                     self.c_tweetConnections.delete_many({ "tweet_seq_no" : { "$gte" : select_cLoadStatus[0]["min_seq"] } })
                 elif collection_name == 'tweetHTConnections':
-                    self.c_tweetHTConnections.delete_many({ "tweet_seq_no" : { "$gte" : select_cLoadStatus[0]["min_seq"] } })                
+                    self.c_tweetHTConnections.delete_many({ "tweet_seq_no" : { "$gte" : select_cLoadStatus[0]["min_seq"] } })
                                 
             elif select_cLoadStatus[0]["status"] == "success":
                 last_seq_no = select_cLoadStatus[0]["max_seq"] 
@@ -303,6 +352,59 @@ class TwitterDB:
         print ('loading process completed (' + collection_name + ')... ' + endtime)
         
     
+    def cleanTweetText(self, text):
+        """
+        Method used to clean the tweet message. Hashtags, user screen names, 
+        links, and special characters are removed.
+        
+        Parameters
+        ----------                                       
+        text :
+            the string to clean
+            
+        Return
+        --------              
+        text_clean :
+            the string after it's been cleaned
+    
+        Examples
+        --------                              
+            >>> cleanTweetText('re The text to Clean for @Jane!!! :) #python')
+            The text to Clean for
+        """    
+        
+        text = text.replace("\\", "").replace('\"', "").replace("\r","")
+        text = text.replace("\n","").replace("\t", "").rstrip()
+        text = text.lower()       
+
+        # removing hashtahs, mentions and links from clean text    
+        text_clean = text.replace("http", " http").replace("#", " #")        
+        text_clean = text_clean.replace("@", " @").replace("  ", " ").strip()
+        words = text_clean.split()
+        text_clean = ''            
+        for word in list(words):            
+            if word[0:1] != '#' and word[0:1] != '@' and word[0:4] != 'http'and word[0:2] != 'rt':
+                text_clean = text_clean + word + ' '                                    
+
+        # removing apecial characters
+        text_clean = text_clean.replace("\\", "").replace("@","").replace("!", "")
+        text_clean = text_clean.replace("/", "").replace("*", "").replace("&amp;", "")
+        text_clean = text_clean.replace("-", "").replace("~", "").replace("`", "")
+        text_clean = text_clean.replace("#", "").replace("$", "").replace("…", "")
+        text_clean = text_clean.replace("%", "").replace("^", "").replace("&", "")
+        text_clean = text_clean.replace("(", "").replace(")", "").replace("—", "")
+        text_clean = text_clean.replace("=", "").replace("+", "").replace("{", "")
+        text_clean = text_clean.replace("}", "").replace("[", "").replace("“", "")
+        text_clean = text_clean.replace("’", "").replace("]", "").replace("|", "")
+        text_clean = text_clean.replace("'", "").replace('"', "").replace("?", "")
+        text_clean = text_clean.replace(":", "").replace(";", "").replace("<", "")
+        text_clean = text_clean.replace(">", "").replace(",", "").replace(".", "")
+        text_clean = text_clean.replace("_", "").replace("\\\\", "")
+        text_clean = text_clean.replace("  ", " ").strip()
+
+        return text_clean
+
+    
     #####################################
     # Method: loadFocusedData
     # Description: This method will call loadCollection_UpdateStatus to load the focusedtweet collection
@@ -310,6 +412,23 @@ class TwitterDB:
     #   -inc = how many tweet records you want to load at the time. 
     #   (Large number may cause memory errors, low number may take too long to run)
     def loadFocusedData(self, inc):
+        """
+        Method to load focused data into mongoDB based on the configurations set on setFocusedDataConfigs. 
+        It creates collection tweetFocusedData
+        
+        Parameters
+        ----------                                       
+        inc : 
+            used to determine how many tweets will be processed at a time.
+            A large number may cause out of memory errors, and a low number may take a long time to run, 
+            so the decision of what number to use should be made based on the hardware specification.
+            the string to clean
+                   
+        Examples
+        --------                              
+            >>> loadFocusedData(50000)            
+        """    
+        
         
         self.loadCollection_UpdateStatus('focusedTweet', inc )
         
@@ -341,8 +460,7 @@ class TwitterDB:
             day =  tweet['created_at'][8:10]
             user_id =  tweet['user']['id_str']
             
-            
-            
+                        
             ## ***************************************************
             ## *** Getting the text information from differnt fields and different formats ****    
 
@@ -389,6 +507,10 @@ class TwitterDB:
             
             text_combined = text_lower + ' ' + quote_text
             
+            
+            text_combined_clean = self.cleanTweetText(text_combined)
+            
+            '''
             # removing hashtahs, mentions and links from clean text    
             text_combined_clean = text_combined.replace("http", " http").replace("#", " #")        
             text_combined_clean = text_combined_clean.replace("@", " @").replace("  ", " ").strip()
@@ -412,7 +534,7 @@ class TwitterDB:
             text_combined_clean = text_combined_clean.replace(">", "").replace(",", "").replace(".", "")
             text_combined_clean = text_combined_clean.replace("_", "").replace("\\\\", "")
             text_combined_clean = text_combined_clean.replace("  ", " ").strip()
-
+            '''
             ## ***************************************************************************
             
             
@@ -554,6 +676,26 @@ class TwitterDB:
     #   -user_type_filter = the type of user you want to load - 
     #    (Options: tweet, retweet, quote, reply and mention)
     def loadUsersData(self, inc, user_type_filter):
+        """
+        Method to load user data into mongoDB. 
+        It creates collection users
+        
+        Parameters
+        ----------                                       
+        inc : 
+            used to determine how many tweets will be processed at a time.
+            A large number may cause out of memory errors, and a low number may take a long time to run, 
+            so the decision of what number to use should be made based on the hardware specification.
+            the string to clean
+        user_type_filter :
+            the type of user you want to load - 
+            (Options: tweet, retweet, quote, reply and mention)
+                   
+        Examples
+        --------                              
+            >>> loadUsersData(50000, 'tweet')
+        """    
+        
         self.loadCollection_UpdateStatus('users', inc, user_type_filter)
         
 
@@ -587,6 +729,8 @@ class TwitterDB:
                 description_clean = description.replace("\\", "").replace('\"', "").replace("\r","")
                 description_clean = description_clean.replace("\n","").replace("\t", "").rstrip()
 
+            if screen_name is None:
+                screen_name = user_id_str  
                 
             data = '{"screen_name":"' + screen_name  + '"}'
             doc = json.loads(data)
@@ -776,6 +920,22 @@ class TwitterDB:
     #   -inc = how many tweet records you want to load at the time. 
     #    (Large number may cause memory errors, low number may take too long to run)        
     def loadTweetHashTags(self, inc):
+        """
+        Method to load hashthas in a separate collection in mongoDB. 
+        It creates the tweetHashTags collection.
+        
+        Parameters
+        ----------                                       
+        inc : 
+            used to determine how many tweets will be processed at a time.
+            A large number may cause out of memory errors, and a low number may take a long time to run, 
+            so the decision of what number to use should be made based on the hardware specification.
+            the string to clean
+                   
+        Examples
+        --------                              
+            >>> loadTweetHashTags(50000)
+        """    
         
         self.loadCollection_UpdateStatus('tweetHashTags', inc )        
         
@@ -866,6 +1026,22 @@ class TwitterDB:
     #   -inc = how many tweet records you want to load at the time. 
     #    (Large number may cause memory errors, low number may take too long to run)     
     def loadTweetConnections(self, inc):
+        """
+        Method to load tweet connection in a separate collection in mongoDB. 
+        It creates the tweetConnections collection.
+        
+        Parameters
+        ----------                                       
+        inc : 
+            used to determine how many tweets will be processed at a time.
+            A large number may cause out of memory errors, and a low number may take a long time to run, 
+            so the decision of what number to use should be made based on the hardware specification.
+            the string to clean
+                   
+        Examples
+        --------                              
+            >>> loadTweetConnections(50000)
+        """    
         
         self.loadCollection_UpdateStatus('tweetConnections', inc)
                 
@@ -900,7 +1076,12 @@ class TwitterDB:
                 quoted_status_id = ''
             if in_reply_to_status_id is None:
                 in_reply_to_status_id = ''
+            if screen_name_a is None:
+                screen_name_a = user_id_str_a
+            if screen_name_b is None:
+                screen_name_b = user_id_str_b
                 
+             
             #to set the edge_screen_name_directed_key
             if screen_name_a > screen_name_b:
                 screen_name_a_un = screen_name_a
@@ -1055,6 +1236,22 @@ class TwitterDB:
     #   -inc = how many tweet records you want to load at the time. 
     #    (Large number may cause memory errors, low number may take too long to run)     
     def loadTweetHTConnections(self, inc):
+        """
+        Method to load hashtag connection in a separate collection in mongoDB. 
+        It creates the tweetHTConnections collection.
+        
+        Parameters
+        ----------                                       
+        inc : 
+            used to determine how many tweets will be processed at a time.
+            A large number may cause out of memory errors, and a low number may take a long time to run, 
+            so the decision of what number to use should be made based on the hardware specification.
+            the string to clean
+                   
+        Examples
+        --------                              
+            >>> loadTweetHTConnections(50000)
+        """            
         
         self.loadCollection_UpdateStatus('tweetHTConnections', inc)
                 
@@ -1142,6 +1339,22 @@ class TwitterDB:
     #   -inc = how many tweet records you want to load at the time. 
     #          (Large number may cause memory errors, low number may take too long to run)    
     def loadWordsData(self, inc):
+        """
+        Method to load the tweet words in a separate collection in mongoDB. 
+        It creates the tweetWords collection.
+        
+        Parameters
+        ----------                                       
+        inc : 
+            used to determine how many tweets will be processed at a time.
+            A large number may cause out of memory errors, and a low number may take a long time to run, 
+            so the decision of what number to use should be made based on the hardware specification.
+            the string to clean
+                   
+        Examples
+        --------                              
+            >>> loadWordsData(50000)
+        """    
         
         self.loadCollection_UpdateStatus('tweetWords', inc )        
             
@@ -1279,6 +1492,21 @@ class TwitterDB:
     #   (Options: tweetCountByFile, hashtagCount, tweetCountByLanguageAgg, 
     #             tweetCountByMonthAgg, tweetCountByUser)
     def loadAggregations(self, aggType):
+        """
+        Method to load addtional aggregated collection to MongoDB
+        It creates the tweetWords collection.
+        
+        Parameters
+        ----------                                       
+        aggType : 
+            the type of aggreagation you want to run.
+            (Options: tweetCountByFile, hashtagCount, tweetCountByLanguageAgg, 
+            tweetCountByMonthAgg, tweetCountByUser)
+            
+        Examples
+        --------                              
+            >>> loadAggregations('tweetCountByFile')
+        """    
     
         print ("loading " + aggType + " process started....")
         
@@ -1503,6 +1731,25 @@ class TwitterDB:
     #   -inc = how many tweets we want to update at the time for field is_bot_connection.
     #    Default=10000 (High number might take too long to run)
     def set_bot_flag_based_on_arr(self, bots_list_id_str, inc=10000):
+        """
+        Method to update MongoDb collection with a flag identifieng 
+        is a user is a bot or not. 
+        It updates the records based on a given list of user_ids.        
+        
+        Parameters
+        ----------      
+        bots_list_id_str :
+            and array with a list of Twitter user ids that are bots
+            
+        inc : (Optional)
+            how many tweets we want to update at the time for field is_bot_connection.
+            Default=10000 (High number might take too long to run)
+                   
+        Examples
+        --------                              
+            >>> arr_bots = ['123456', '1231654']
+            >>> set_bot_flag_based_on_arr(arr_bots, 20000)
+        """    
         
         print("updating bot flag...")
         
@@ -1624,6 +1871,14 @@ class TwitterDB:
             include_hashsymb_FL='Y',  
             replace_existing_file=True, 
             user_conn_filter=None):
+            
+        """
+        Method to export the data from MongoDb into text files based on certain filters.        
+               
+        Examples
+        --------                              
+            >>> ...
+        """  
                 
         
         #export edges   
@@ -1738,6 +1993,16 @@ class TwitterDB:
             ht_to_filter=None, 
             include_hashsymb_FL='Y', 
             user_conn_filter=None):
+            
+        """
+        Method to query the data from MongoDb. 
+        The method return an array with the data retrieved from MongoDB.
+               
+        Examples
+        --------                              
+            >>> ...
+        """  
+        
 
         arr = []
         
@@ -1841,7 +2106,7 @@ class TwitterDB:
 
             #get data from database, loop through records and insert into array
             for x in select_texts:
-                arr.append([x['text_combined_clean']])                
+                arr.append([x['text_combined_clean']])
             
             #set file path
             file = filepath + 'T_tweetTextsForTopics.txt'
@@ -2383,8 +2648,8 @@ class TwitterDB:
     # Description: Method used to export an array to a t\ delimited file
     # Parameters: arrData = the array with the data you want to export
     # file = the path and name of the file you want to export
-    def exportToFile(self, arrData, file): 
-
+    def exportToFile(self, arrData, file):         
+        
         myFile = open(file, 'w', encoding="utf-8")
         with myFile:
             writer = csv.writer(myFile, delimiter='\t', lineterminator='\n')
@@ -2599,3 +2864,371 @@ class TwitterDB:
 
         endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print ("loading process completed. " + endtime)
+        
+     
+    # search7dayapi
+    def search7dayapi(
+            self, 
+            consumer_key, 
+            consumer_secret, 
+            access_token, 
+            access_token_secret, 
+            query, 
+            result_type= 'mixed', 
+            max_count='100', 
+            lang='en'):
+        """
+        Send requests to the 7-Day search API and save data into MongoDB
+                
+        Parameters
+        ----------               
+        consumer_key : 
+            User's consumer key               
+            
+        consumer_secret :
+            User's consumer secret
+        
+        access_token : 
+            User's access token
+
+        access_token_secret : 
+            User's access token secret
+
+        query :
+            The query that will be used to filter the tweets
+            
+        result_type : 
+            Options: recent, popular, or mixed
+            
+        max_count : 
+            The number of tweets to be returned at a time
+            
+        lang :     
+            Language to filter the tweets
+            
+        Returns
+        -------
+        response 
+            the response received from Twitter, which will contain either the tweets retrieved from the search, or the error message if any      
+    
+        Examples
+        --------                  
+            >>> # send request to 7-day search API
+            >>> response = myAnalysisObj.search7dayapi(
+            >>>     consumer_key = '[key]',
+            >>>     consumer_secret = '[secret]',
+            >>>     access_token = '[token]',
+            >>>     access_token_secret = '[token_secret]',
+            >>>     query = 'austintexas OR atx OR austintx OR atxlife',
+            >>>     result_type = 'mixed',
+            >>>     max_count = '100',
+            >>>     lang = 'en')    
+        """       
+        
+        
+        aut = OAuth1(consumer_key, consumer_secret, access_token, access_token_secret)
+        
+        endpoint = 'https://api.twitter.com/1.1/search/tweets.json?q=' + query + '&count=' + max_count + '&lang=' + lang + '&include_entities=true&tweet_mode=extended&result_type=' + result_type + ''
+        
+        response = requests.get(endpoint, auth=aut).json()        
+        
+        # if there was an error, print error and end method
+        if 'error' in response:            
+            print (response)
+            return ''
+        
+        tweets = json.loads(json.dumps(response, indent = 2))
+        
+        if 'search_metadata' in tweets:
+            search = tweets['search_metadata']
+        else:
+            search = {}
+            
+        # insert tweets into DB
+        self.insertTweetToDBFromAPI(tweets, 'statuses', search, '7day')
+            
+        return response
+    
+    
+    
+    # searchPremiumAPI
+    def searchPremiumAPI(self, 
+            twitter_bearer, 
+            api_name, 
+            dev_environment,
+            query, 
+            date_start, 
+            date_end, 
+            next_token = None, 
+            max_count='100'):
+            
+        """
+        Send requests to the Premium search API and save data into MongoDB
+                
+        Parameters
+        ----------               
+        twitter_bearer : 
+            bearer authentication token created from the consumer_key and consumer_secret
+        
+        api_name :
+            the options are either 30day or FullArchive
+        
+        dev_environment :
+            the name of the environment created on the Twitter's developer account
+        
+        query :
+            the query that will be used to filter the tweets
+            
+        date_start : 
+            the start date that will be used to filter the tweets.
+        
+        date_end :            
+            the end date that will be used to filter the tweets.
+            
+        next_token :             
+            then token that points to the previous search done with the same query.
+            
+        max_count : 
+            the number of tweets to be returned at a time
+            
+            
+        Returns
+        -------
+        response 
+            the response received from Twitter, which will contain either the tweets retrieved from the search, or the error message if any      
+        
+        next_token
+            token value that can be used for the next request, that way it is possible to avoid searches for the same records
+    
+        Examples
+        --------                  
+            >>> # send request to premium API
+            >>> response, next_token = myAnalysisObj.searchPremiumAPI(
+            >>>     twitter_bearer = '[bearer]',
+            >>>     api_name = '30day',
+            >>>     dev_environment = 'myDevEnv.json',
+            >>>     query = '(coronavirus OR COVID19) lang:en',
+            >>>     date_start = '202002150000',
+            >>>     date_end = '202002160000',
+            >>>     next_token = None,
+            >>>     max_count = '100'
+            >>> )   
+        """              
+        
+        headers = {"Authorization":"Bearer " + twitter_bearer + "", "Content-Type": "application/json"}  
+        endpoint = "https://api.twitter.com/1.1/tweets/search/" + api_name + "/" + dev_environment
+      
+        if next_token is None:
+            data = '{"query":"' + query + '","fromDate":"' + date_start + '","toDate":"' + date_end + '", "maxResults":"' + max_count + '"}' 
+        else:
+            data = '{"query":"' + query + '","fromDate":"' + date_start + '","toDate":"' + date_end +'", "next":"' + next_token + '", "maxResults":"' + max_count + '"}'
+            
+        response = requests.post(endpoint,data=data,headers=headers).json()
+        
+        # if there was an error, print error and end method
+        if 'error' in response:            
+            print (response)
+            return ''
+    
+        # load tweets into a json variable
+        tweets = json.loads(json.dumps(response, indent = 2)) 
+                
+        #Get "next"token
+        if 'next' in tweets:
+            next_token = tweets['next']
+        else:
+            next_token = ""            
+
+        # save what information was used for this search
+        search = json.loads(data)
+        a_dict = {'next': next_token}                
+        search.update(a_dict)                
+            
+        # insert tweets into DB
+        self.insertTweetToDBFromAPI(tweets, 'results', search, api_name)
+            
+        return response, next_token
+
+            
+    # insertTweetToDB
+    def insertTweetToDBFromAPI(self, tweets, parent_field, search, api):
+         
+        seq_no = 0
+        select_cTweet = self.c_tweet.aggregate( [{"$group": {"_id": "seq_agg" , "count": { "$max": "$seq_no" } } } ])
+        for tweetCount in select_cTweet:
+            seq_no = tweetCount["count"]
+    
+        if parent_field in tweets:
+            
+            #Insert into searches table
+            a_dict = {'search_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'api': api}                
+            search.update(a_dict)            
+            result = self.c_searches.insert_one(search)
+
+            #Insert into tblTweet table
+            for tweet in tweets[parent_field]:
+
+                seq_no = seq_no + 1
+
+                #adding extra fields to document to suport future logic (processed_fl, load_time, file_path )
+                a_dict = {'processed_fl': 'N', 'seq_no': seq_no, 'seq_agg': "A", 'load_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}                
+                tweet.update(a_dict)
+
+                try:
+                    result = self.c_tweet.insert_one(tweet)
+                except:
+                    result = "" 
+                    
+                    
+
+    # create python script and .bat file for scheduled processing
+    def create_bat_file_apisearch(self, 
+            mongoDBServer,
+            mongoDBName,
+            file_path,
+            python_path,
+            consumer_key,
+            consumer_secret,
+            access_token,
+            access_token_secret,
+            query,
+            result_type='mixed', 
+            max_count='100',
+            lang='en'):
+            
+        """
+        The method will create two files, one python script containing the code necessary to make the requests, 
+        and a *.bat* file that can be used to schedule the call of the python script.
+                
+        Parameters
+        ----------  
+        mongoDBServer :
+            the mongoDB server that will be used to save the tweets
+        
+        mongoDBName :
+            the mongoDB name that will be used to save the tweets
+        
+        file_path :
+            the folder path where the files will be saved
+        
+        python_path :        
+            the path where the python.exe is installed
+            
+        consumer_key : 
+            User's consumer key               
+            
+        consumer_secret :
+            User's consumer secret
+        
+        access_token : 
+            User's access token
+
+        access_token_secret : 
+            User's access token secret
+
+        query :
+            The query that will be used to filter the tweets
+            
+        result_type : 
+            Options: recent, popular, or mixed
+            
+        max_count : 
+            The number of tweets to be returned at a time
+            
+        lang :     
+            Language to filter the tweets                  
+            
+        Examples
+        --------                  
+            >>> create python script and .bat file for scheduled processing
+            >>> create_bat_file_apisearch( 
+            >>>         mongoDBServer='mongodb://localhost:27017',
+            >>>         mongoDBName='myDBName',
+            >>>         file_path='C:\\Data\\myScriptsFolder\\MyScriptName.py',
+            >>>         python_path='C:\\Users\\Me\Anaconda3\envs\myEnv\python.exe',
+            >>>         consumer_key = '[key]',
+            >>>         consumer_secret = '[secret]',
+            >>>          access_token = '[token]',
+            >>>         access_token_secret = '[token_secret]',
+            >>>         query = 'austintexas OR atx OR austintx OR atxlife',
+            >>>         result_type = 'mixed',
+            >>>         max_count = '100',
+            >>>         lang = 'en')
+        """    
+        
+    
+        # create path is does not exist
+        if not os.path.exists(os.path.dirname(file_path)):
+            os.makedirs(os.path.dirname(file_path))
+                        
+        f = open(file_path, "w")        
+        
+        f.write("import json\n")
+        f.write("import requests\n")
+        f.write("from pymongo import MongoClient\n")
+        f.write("from requests_oauthlib import OAuth1\n")
+        f.write("import datetime\n")
+        f.write("\n")
+
+        f.write("mongoDBServer = '" + mongoDBServer + "'\n")
+        f.write("client = MongoClient(mongoDBServer)\n")
+        f.write("db = client." + mongoDBName + "\n")
+        f.write("\n")
+        
+        f.write("# Create unique index on tweet table to make sure we don't store duplicate tweets\n")
+        f.write("try:\n")
+        f.write("    resp = self.c_tweet.create_index([('id', pymongo.ASCENDING)],unique = True)\n")
+        f.write("except:\n")
+        f.write("    pass\n")
+        f.write("\n")        
+        
+        f.write("aut = OAuth1(" + "'" + consumer_key + "'" + ","  + "'" + consumer_secret  + "'" + ","  + "'" + access_token + "'" + ","  + "'" + access_token_secret  + "'" + ")\n")
+        f.write("\n")
+        
+        endpoint = 'https://api.twitter.com/1.1/search/tweets.json?q=' + query + '&count=' + max_count + '&lang=' + lang + '&include_entities=true&tweet_mode=extended&result_type=' + result_type + ''
+        f.write("endpoint = " + "'" + endpoint + "'\n") 
+        f.write("\n")
+        
+        f.write("response = requests.get(endpoint, auth=aut).json()")
+        f.write("\n")
+        
+        f.write("# if there was an error, print error and end method\n")
+        f.write("if 'error' in response:\n")
+        f.write("    print (response)\n")        
+        f.write("    \n")
+        f.write("tweets = json.loads(json.dumps(response, indent = 2))\n")
+        f.write("\n")
+        f.write("search = tweets['search_metadata']\n")
+        f.write("\n")       
+        f.write("seq_no = 0\n")
+        f.write("select_cTweet = db.tweet.aggregate( [{'$group': {'_id': 'seq_agg' , 'count': { '$max': '$seq_no' } } } ])\n")
+        f.write("for tweetCount in select_cTweet:\n")
+        f.write("    seq_no = tweetCount['count']\n")
+        f.write("    \n")
+        f.write("if 'statuses' in tweets:\n")
+        f.write("        \n")
+        f.write("    #Insert into searches table\n")
+        f.write("    a_dict = {'search_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'api': '7day'}\n")                
+        f.write("    search.update(a_dict)\n")   
+        f.write("    result = db.searches.insert_one(search)\n")
+        f.write("    \n")
+        f.write("    #Insert into tblTweet table\n")
+        f.write("    for tweet in tweets['statuses']:\n")
+        f.write("    \n")
+        f.write("        seq_no = seq_no + 1\n")
+        f.write("        \n")
+        f.write("        #adding extra fields to document to suport future logic (processed_fl, load_time, file_path )\n")
+        f.write("        a_dict = {'processed_fl': 'N', 'seq_no': seq_no, 'seq_agg': 'A', 'load_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write("        tweet.update(a_dict)\n")
+        f.write("        \n")
+        f.write("        try:\n")
+        f.write("            result = db.tweet.insert_one(tweet)\n")
+        f.write("        except:\n")
+        f.write("            result = ''\n")
+                    
+        f.close()
+        
+        print(python_path)
+        fbat = open(os.path.dirname(file_path) + '\\twitter_request_script.bat', "w")        
+        fbat.write('start ' + python_path + ' "' + file_path + '"')               
+        fbat.close()

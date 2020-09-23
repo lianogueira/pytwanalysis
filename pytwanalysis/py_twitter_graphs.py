@@ -75,77 +75,10 @@ class TwitterGraphs:
     def plotSpringLayoutGraph(self, G, v_graph_name, v_scale, v_k, v_iterations, 
                               cluster_fl='N', v_labels=None, kmeans_k='', v_node_color='#A0CBE2', v_edge_color='#A79894', 
                               v_width=0.05, v_node_size=0.6, v_font_size=1, v_dpi=900):
-
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing plotSpringLayoutGraph... Started at: " + starttime)
-        
-        pos=nx.spring_layout(G, scale=v_scale, k=v_k, iterations=v_iterations)   #G is my graph
-        if cluster_fl == 'N':
-            #nx.draw(G, pos, node_color=v_node_color, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=v_node_size, font_size=v_font_size )
-            d = dict(G.degree)
-            nx.draw(G, pos, node_color=v_node_color, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=[(v * 6)/10 for v in d.values()], font_size=v_font_size )
-        else:
-            d = dict(G.degree)
-            #nx.draw(G, pos, node_color=v_labels, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=v_node_size, font_size=v_font_size )
-            #nx.draw(G, pos, node_color=v_labels, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=v_node_size, font_size=v_font_size, node_shape="o", alpha=0.6, linewidths=0.6 )
-            nx.draw(G, pos, node_color=v_labels, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=[(v * 6)/10 for v in d.values()], font_size=v_font_size, node_shape="o", alpha=0.6, linewidths=0.6 )
- 
-
-        #nx.draw(G_to_plot2, nodelist=d.keys(), node_size=[(v * 2)/10 for v in d.values()])
-
-        plt.savefig(v_graph_name, dpi=v_dpi, facecolor='w', edgecolor='w')
-        plt.show()
-        plt.cla()   # Clear axis
-        plt.clf()   # Clear figure
-        plt.close() # Close a figure window
-        
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing plotSpringLayoutGraph. Ended at: " + endtime)
-
-        #print details into file
-        f = open(self.graph_details_file, "a")
-        f.write(v_graph_name + '\t ' + str(v_scale) + '\t ' + str(v_iterations) + '\t ' + str(kmeans_k) + '\t' + starttime + '\t' + endtime + '\n')
-        f.close()        
-     '''
-    
-    
-    '''
-    def plotSpringLayoutGraph(self, G, v_graph_name, v_scale, v_k, v_iterations, cluster_fl='N', v_labels=None, kmeans_k='', v_node_color='#A0CBE2', v_edge_color='#A79894', v_width=0.05, v_node_size=0.6, v_font_size=1, v_dpi=900):               
-
-        starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Executing plotSpringLayoutGraph... Started at: " + starttime)
-        
-        pos=nx.spring_layout(G, scale=v_scale, k=v_k, iterations=v_iterations)   #G is my graph
-        if cluster_fl == 'N':
-            #nx.draw(G, pos, node_color=v_node_color, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=v_node_size, font_size=v_font_size )
-            d = dict(G.degree)
-            nx.draw(G, pos, node_color=v_node_color, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=[(v * 6)/10 for v in d.values()], font_size=v_font_size )
-        else:
-            d = dict(G.degree)
-            #nx.draw(G, pos, node_color=v_labels, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=v_node_size, font_size=v_font_size )
-            #nx.draw(G, pos, node_color=v_labels, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=v_node_size, font_size=v_font_size, node_shape="o", alpha=0.6, linewidths=0.6 )
-            nx.draw(G, pos, node_color=v_labels, edge_color=v_edge_color, width=v_width, edge_cmap=plt.cm.Blues, with_labels=True, node_size=[(v * 6)/10 for v in d.values()], font_size=v_font_size, node_shape="o", alpha=0.6, linewidths=0.6 )
- 
-
-        #nx.draw(G_to_plot2, nodelist=d.keys(), node_size=[(v * 2)/10 for v in d.values()])
-
-        plt.savefig(self.folder_path + '\\' + v_graph_name, dpi=v_dpi, facecolor='w', edgecolor='w')
-        plt.show()
-        plt.cla()   # Clear axis
-        plt.clf()   # Clear figure
-        plt.close() # Close a figure window
-        
-        endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("Finished executing plotSpringLayoutGraph. Ended at: " + endtime)
-
-        #print details into file
-        f = open(self.graph_details_file, "a")
-        f.write(v_graph_name + '\t ' + str(v_scale) + '\t ' + str(v_iterations) + '\t ' + str(kmeans_k) + '\t' + starttime + '\t' + endtime + '\n')
-        f.close()          
     '''
     
         
-        
+
     #####################################
     # Method: plot_graph_att_distr
     # Description: Plot distribution of nodes based on graph attribute (e.g. communitiy)
@@ -697,7 +630,7 @@ class TwitterGraphs:
     
         
     #####################################
-    # Method: remove_edges_eithernode
+    # Method: remove_edges
     # Description: removes edges of nodes with less than the given degree. 
     # (both nodes in the edge must be less than the given degree for us to remove the edge)
     def remove_edges(self, G, min_degree_no):
@@ -742,12 +675,9 @@ class TwitterGraphs:
     # Method: contract_nodes_degree1
     # Description: Contract nodes degree 1 in groups of the given number
     def contract_nodes_degree1(self, G, n_to_group):    
+        
         G2 = G.copy()    
-        degree_to_contract = 1
-                 
-        #starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        #print("Executing contract_nodes_degree1... Started at: " + starttime )
-
+        degree_to_contract = 1                 
         
         for node_degree in list(sorted(G2.degree, key=lambda x: x[1], reverse=True)):    
             
@@ -774,9 +704,7 @@ class TwitterGraphs:
 
             except Exception as e:        
                 continue
-
-        #endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        #print("Finished executing contract_nodes_degree1. Ended at: " + endtime)             
+          
 
         return G2    
     
@@ -869,7 +797,3 @@ class TwitterGraphs:
                 f.write("Centers with their degree: " + str_centers_nodes + "\n")
                 
             f.close()
-
-
-        #endtime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        #print("Finished executing print_Measures. Ended at: " + endtime)                

@@ -23,8 +23,6 @@ import numpy as np
 from PIL import Image
 from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 
-
-
 #dictionary_words = dict.fromkeys(words.words(), None)
    
 #stopWords = set(stopwords.words('english'))
@@ -97,7 +95,7 @@ class TwitterTopics:
 
 
     #clean documents for topic analysis
-    def clean(self, doc, delete_numbers=True, delete_stop_words=True, lemmatize_words=True): 
+    def clean_docs(self, doc, delete_numbers=True, delete_stop_words=True, lemmatize_words=True): 
         
         doc_clean = doc
         
@@ -122,7 +120,7 @@ class TwitterTopics:
         #starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         #print("Executing train_model... Started at: " + starttime )        
 
-        doc_clean = [self.clean(doc, delete_numbers, delete_stop_words, lemmatize_words).split() for doc in topic_docs]
+        doc_clean = [self.clean_docs(doc, delete_numbers, delete_stop_words, lemmatize_words).split() for doc in topic_docs]
 
         # Creating the term dictionary of our corpus, where every unique term is assigned an index. dictionary = corpora.Dictionary(doc_clean)
         self.dictionary = corpora.Dictionary(doc_clean)
